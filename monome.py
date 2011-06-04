@@ -74,7 +74,7 @@ class Monome(OSCServer):
         msg = OSCMessage("/sys/info")
         self.client.send(msg)
         
-        self.app_callback = None
+        #self.app_callback = None
     
     def sys_misc(self, *args):
         pass
@@ -123,7 +123,7 @@ class Monome(OSCServer):
     
     def monome_handler(self, addr, tags, data, client_address):
         if addr.startswith(self.prefix):
-            if self.app_callback:
+            if hasattr(self, 'app_callback'):
                 self.app_callback(addr.replace(self.prefix, "", 1), data)
         else:
 			raise NoCallbackError(addr)
