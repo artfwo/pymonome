@@ -28,9 +28,8 @@ m.led_all(0)
 try:
     while True:
         for i in range(8):
-            m.led_set(0, 0, random.randint(0,1))
-            m.led_set(7, 7, random.randint(0,1))
-            time.sleep(1.0/1000)
+            m.led_row(0, i, random.randint(0,255))
+            time.sleep(1.0/20)
 except KeyboardInterrupt:
     m.led_all(0)
     m.close()
