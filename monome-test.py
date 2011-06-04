@@ -1,22 +1,12 @@
 #! /usr/bin/env python
 
 import time, random
-from monome import Monome, MonomeBrowser
+from monome import Monome, MonomeBrowser, find_monome
 
-# lookup for monome (can skip this if you know the host/port)
-serial = 'a40h-458'
-browser = MonomeBrowser()
-browser.start()
-print "looking for %s" % serial
-while not browser.devices.has_key(serial):
-    time.sleep(0)
-print "found!"
-host, port = browser.devices[serial]
-browser.close()
-
-# connect to the monome
-m = Monome('localhost', port) # don't use resolved host, 'cause it doesn't work
-m.start() # begin processing callbacks
+# try to find a monome (you can skip this if you already know the host/port)
+host, port = find_monome('a40h-458')
+m = Monome('localhost', port)
+m.start()
 
 def mycallback(addr, data):
     x, y, s = data

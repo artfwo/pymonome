@@ -171,7 +171,7 @@ class MonomeBrowser(object):
         # FIXME: IPV4 and IPv6 are separate services and are resolved twice
         if not (flags & pybonjour.kDNSServiceFlagsAdd):
             if self.devices.has_key(serial):
-                print "%s removed" % serial
+                #print "%s removed" % serial
                 del self.devices[serial]
             return
         
@@ -189,7 +189,7 @@ class MonomeBrowser(object):
             resolve_sdRef.close()
         
         if self.resolved and not self.devices.has_key(serial):
-            print "%s detected" % serial
+            #print "%s detected" % serial
             self.devices[serial] = (self.resolved_host, self.resolved_port)
         self.resolved = False
 
@@ -214,3 +214,11 @@ class MonomeBrowser(object):
         self.running = False
         #self.sdRef.close()
 
+def find_monome(serial):
+    browser = MonomeBrowser()
+    browser.start()
+    while not browser.devices.has_key(serial):
+        browser.poll()
+    host, port = browser.devices[serial]
+    browser.close()
+    return host, port
