@@ -1,0 +1,11 @@
+monome application library for python.
+
+this repository includes the following third-party modules:
+
+pybonjour (MIT License):
+    Copyright (c) 2007-2008 Christopher J. Stawarz
+
+pyOSC (LPGL-2.1+ License):
+    Copyright (c) Daniel Holth & Clinton McChesney.
+    Copyright (c) 2008-2010, Artem Baguinski <artm@v2.nl> et al., Stock, V2_Lab, Rotterdam, Netherlands.
+    Copyright (c) 2010 Uli Franke <uli.franke@weiss.ch>, Weiss Engineering, Uster, Switzerland.
