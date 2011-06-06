@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 import time, random
-from monome import Monome, MonomeBrowser, find_monome
+from monome import Monome, find_any_monome
 
 # try to find a monome (you can skip this if you already know the host/port)
 print "looking for a monome..."
