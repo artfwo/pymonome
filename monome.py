@@ -37,6 +37,22 @@ def unpack_row(val):
         val >> 7 & 1
     ]
 
+def find_any_monome():
+    browser = MonomeBrowser()
+    while len(browser.devices) < 1:
+        browser.poll()
+    host, port = browser.devices.values()[0]
+    browser.close()
+    return host, port
+
+def find_monome(serial):
+    browser = MonomeBrowser()
+    while not browser.devices.has_key(serial):
+        browser.poll()
+    host, port = browser.devices[serial]
+    browser.close()
+    return host, port
+
 def fix_prefix(s):
     return '/%s' % s.strip('/')
 
@@ -123,8 +139,11 @@ class Monome(OSCServer):
     
     def monome_handler(self, addr, tags, data, client_address):
         if addr.startswith(self.prefix):
-            if hasattr(self, 'app_callback'):
-                self.app_callback(addr.replace(self.prefix, "", 1), data)
+            try:
+                method = addr.replace(self.prefix, "", 1).replace("/", "_").strip("_")
+                getattr(self, method)(*data)
+            except AttributeError:
+                pass
         else:
 			raise NoCallbackError(addr)
     
@@ -214,11 +233,3 @@ class MonomeBrowser(object):
         self.running = False
         #self.sdRef.close()
 
-def find_monome(serial):
-    browser = MonomeBrowser()
-    browser.start()
-    while not browser.devices.has_key(serial):
-        browser.poll()
-    host, port = browser.devices[serial]
-    browser.close()
-    return host, port

@@ -4,15 +4,17 @@ import time, random
 from monome import Monome, MonomeBrowser, find_monome
 
 # try to find a monome (you can skip this if you already know the host/port)
-host, port = find_monome('a40h-458')
+print "looking for a monome..."
+host, port = find_any_monome()
+print "found!"
+
 m = Monome('localhost', port)
 m.start()
 
-def mycallback(addr, data):
-    x, y, s = data
+def mycallback(x, y, s):
     m.led_set(x, y, s)
 
-m.app_callback = mycallback
+m.grid_key = mycallback
 
 m.led_all(0)
 try:
