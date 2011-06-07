@@ -24,8 +24,8 @@ class Fader(threading.Thread):
             time.sleep(1.0/16)
 
 class FadersApp(monome.Monome):
-    def __init__(self, host, port):
-        monome.Monome.__init__(self, host, port)
+    def __init__(self, address):
+        monome.Monome.__init__(self, address)
         self.faders = [Fader(self, i) for i in range(8)]
         for f in self.faders:
             f.start()
@@ -39,7 +39,7 @@ print "looking for a monome..."
 host, port = monome.find_any_monome()
 print "found!"
 
-m = FadersApp('localhost', port)
+m = FadersApp((host, port))
 m.start()
 
 m.led_all(0)

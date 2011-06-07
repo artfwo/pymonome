@@ -8,7 +8,7 @@ print "looking for a monome..."
 host, port = find_any_monome()
 print "found!"
 
-m = Monome('localhost', port)
+m = Monome((host, port))
 m.start()
 
 def mycallback(x, y, s):

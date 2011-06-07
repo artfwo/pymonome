@@ -59,9 +59,10 @@ def fix_prefix(s):
 # TODO: unfocus on host 
 # TODO: /sys/connect
 class Monome(OSCServer):
-    def __init__(self, host, port):
+    def __init__(self, address):
         OSCServer.__init__(self, ('', 0))
-        self.client.connect((host, port))
+        self.client.connect(address)
+        host, port = self.client.socket.getsockname()
         
         self.focused = False
         #self.server_host = host
@@ -80,11 +81,11 @@ class Monome(OSCServer):
         
         # handshake
         msg = OSCMessage("/sys/host")
-        msg.append('localhost')
+        msg.append(host)
         self.client.send(msg)
         
         msg = OSCMessage("/sys/port")
-        msg.append(self.server_address[1])
+        msg.append(port)
         self.client.send(msg)
         
         msg = OSCMessage("/sys/info")
