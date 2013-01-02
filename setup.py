@@ -2,9 +2,9 @@ from distutils.core import setup
 
 setup(
     name='pymonome',
-    version='0.2',
+    version='0.2.2',
     packages=['monome', ],
-    license='COPYING',
+    author='Artem Popov',
     url='http://pypi.python.org/pypi/pymonome',
     description='a monome serialosc client in python',
     long_description=open('README').read(),
