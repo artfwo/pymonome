@@ -46,12 +46,26 @@ def find_any_monome():
     return host, port
 
 def find_monome(serial):
+    """
+    find a particular monome indicated by the serial number.
+
+    this function blocks until the monome is available.
+    """
     browser = MonomeBrowser()
     while not browser.devices.has_key(serial):
         browser.poll()
     host, port = browser.devices[serial]
     browser.close()
     return host, port
+
+def list_monomes():
+    """
+    list connected monomes.
+    """
+    browser = MonomeBrowser()
+    browser.poll(timeout=0.05)
+    return browser.devices
+
 
 def fix_prefix(s):
     return '/%s' % s.strip('/')
@@ -149,8 +163,8 @@ class Monome(OSCServer):
 			raise NoCallbackError(addr)
     
     # threading
-    def poll(self):
-        ready = select.select([self], [], [])[0]
+    def poll(self, timeout=None):
+        ready = select.select([self], [], [], timeout)[0]
         for r in ready:
             self.handle_request()
     
@@ -214,8 +228,8 @@ class MonomeBrowser(object):
         self.resolved = False
 
     # threading    
-    def poll(self):
-        ready = select.select([self.sdRef], [], [])[0]
+    def poll(self, timeout=None):
+        ready = select.select([self.sdRef], [], [], timeout)[0]
         for r in ready:
             pybonjour.DNSServiceProcessResult(r)
     
