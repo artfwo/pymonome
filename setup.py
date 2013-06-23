@@ -2,8 +2,8 @@ from distutils.core import setup
 
 setup(
     name='pymonome',
-    version='0.2.2',
-    packages=['monome', ],
+    version='0.2.3',
+    py_modules=['monome'],
     author='Artem Popov',
     url='http://pypi.python.org/pypi/pymonome',
     description='a monome serialosc client in python',
