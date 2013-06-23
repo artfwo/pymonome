@@ -23,7 +23,6 @@ class BridgeFrontend(OSC.OSCServer):
         global backend
         msg = OSC.OSCMessage(addr.replace(self.prefix, backend.prefix, 1))
         map(msg.append, data)
-        print "FRONTEND", msg
         backend.client.send(msg)
 
 class BridgeBackend(monome.Monome):
@@ -34,7 +33,6 @@ class BridgeBackend(monome.Monome):
         global frontend
         msg = OSC.OSCMessage(addr.replace(self.prefix, frontend.prefix, 1))
         map(msg.append, data)
-        print "BACKEND", msg
         frontend.client.send(msg)
 
 parser = argparse.ArgumentParser()
