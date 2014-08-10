@@ -1,28 +1,17 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
-import time, random
-from monome import Monome, find_any_monome
+import asyncio
+from monome import Monome, create_serialosc_connection
 
-# try to find a monome (you can skip this if you already know the host/port)
-print "looking for a monome..."
-host, port = find_any_monome()
-print "found!"
+class Hello(Monome):
+    def __init__(self):
+        super().__init__('/hello')
 
-m = Monome((host, port))
-m.start()
+    def grid_key(self, x, y, s):
+        self.led_row(0, y, [s] * 8)
+        self.led_col(x, 0, [s] * 8)
 
-def mycallback(x, y, s):
-    m.led_set(x, y, s)
-
-m.grid_key = mycallback
-
-m.led_all(0)
-try:
-    while True:
-        for i in range(8):
-            m.led_row(0, i, random.randint(0,255))
-            time.sleep(1.0/20)
-except KeyboardInterrupt:
-    m.led_all(0)
-    m.close()
-
+if __name__ == '__main__':
+    loop = asyncio.get_event_loop()
+    asyncio.async(create_serialosc_connection(Hello, loop=loop))
+    loop.run_forever()

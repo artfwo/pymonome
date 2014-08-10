@@ -1,10 +1,12 @@
 monome application library for Python.
 
-Written by Artem Popov<artfwo@gmail.com>
+Written by Artem Popov <artfwo@gmail.com>
+
+pymonome is currently being rewritten. README will be updated when asyncio/aiosc port is done.
 
 ---
 
-This package depends on pyOSC and pybonjour, which are both installable using pip.
+This package depends on aiosc, which is installable using pip.
 
 See the examples directory for usage examples.
 
