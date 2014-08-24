@@ -50,6 +50,7 @@ class Monome(aiosc.OSCProtocol):
 
         super().__init__(handlers={
             '/sys/disconnect': lambda *args: self.disconnect,
+            #'/sys/connect': lambda *args: self.connect,
             '/sys/{id,size,host,port,prefix,rotation}': self.sys_info,
             '/{}/grid/key'.format(self.prefix): lambda addr, path, x, y, s: self.grid_key(x, y, s),
             '/{}/tilt'.format(self.prefix): lambda addr, path, n, x, y, z: self.tilt(n, x, y, z),
@@ -140,28 +141,28 @@ class BitBuffer:
     def __and__(self, other):
         result = BitBuffer(self.width, self.height)
         for row in range(self.height):
-            for col in range(self.height):
+            for col in range(self.width):
                 result.leds[row][col] = self.leds[row][col] & other.leds[row][col]
         return result
 
     def __xor__(self, other):
         result = BitBuffer(self.width, self.height)
-        for x in range(self.width):
-            for y in range(self.height):
+        for row in range(self.height):
+            for col in range(self.width):
                 result.leds[row][col] = self.leds[row][col] ^ other.leds[row][col]
         return result
 
     def __or__(self, other):
         result = BitBuffer(self.width, self.height)
-        for x in range(self.width):
-            for y in range(self.height):
+        for row in range(self.height):
+            for col in range(self.width):
                 result.leds[row][col] = self.leds[row][col] | other.leds[row][col]
         return result
 
     def led_set(self, x, y, s):
         if x < self.width and y < self.height:
             row, col = y, x
-            self.leds[col][row] = s
+            self.leds[row][col] = s
 
     def led_all(self, s):
         for x in range(self.width):
@@ -184,11 +185,14 @@ class BitBuffer:
     def get_map(self, x_offset, y_offset):
         m = []
         for y in range(y_offset, y_offset + 8):
-            row = []
-            for x in range(x_offset, x_offset + 8):
-                row.append(self.leds[x][y])
+            row = [self.leds[y][col] for col in range(x_offset, x_offset + 8)]
             m.append(row)
         return m
+
+    def render(self, monome):
+        for x_offset in [i * 8 for i in range(self.width // 8)]:
+            for y_offset in [i * 8 for i in range(self.height // 8)]:
+                monome.led_map(x_offset, y_offset, self.get_map(x_offset, y_offset))
 
 class Page:
     def __init__(self, app):
@@ -241,7 +245,7 @@ class Pages(Monome):
         self.pages = pages
         self.current_page = self.pages[0]
         self.switching = False
-        self.pressed_buttons = []
+        self.pressed_buttons = set()
         self.switch = switch
 
     def ready(self):
@@ -261,7 +265,7 @@ class Pages(Monome):
         else:
             raise RuntimeError
 
-    def disconnect(self, *args):
+    def disconnect(self):
         for p in self.pages:
             p.disconnect()
 
@@ -289,9 +293,10 @@ class Pages(Monome):
             return
         # remember pressed buttons so we can flush them later
         if s == 1:
-            self.pressed_buttons.append((x, y))
+            self.pressed_buttons.add((x, y))
         else:
-            # TODO: still getting x not in list errors here
+            # TODO: still getting KeyError here,
+            # make sure we track pushed buttons properly
             self.pressed_buttons.remove((x, y))
         self.current_page.grid_key(x, y, s)
 
@@ -342,9 +347,10 @@ class BaseSerialOsc(aiosc.OSCProtocol):
         self.send('/serialosc/notify', self.host, self.port)
 
 class SerialOsc(BaseSerialOsc):
-    def __init__(self, apps, loop=None):
+    def __init__(self, app_factories, loop=None):
         super().__init__()
-        self.apps = apps
+        self.app_factories = app_factories
+        self.app_instances = {}
 
         if loop is None:
             loop = asyncio.get_event_loop()
@@ -353,28 +359,27 @@ class SerialOsc(BaseSerialOsc):
     def device_added(self, id, type, port):
         super().device_added(id, type, port)
 
-        if id in self.apps:
-            asyncio.async(self.autoconnect(self.apps[id], port))
-        elif '*' in self.apps:
-            asyncio.async(self.autoconnect(self.apps['*'], port))
+        if id in self.app_factories:
+            asyncio.async(self.autoconnect(id, self.app_factories[id], port))
+        elif '*' in self.app_factories:
+            asyncio.async(self.autoconnect(id, self.app_factories['*'], port))
 
     @asyncio.coroutine
-    def autoconnect(self, app, port):
+    def autoconnect(self, id, app, port):
         transport, app = yield from self.loop.create_datagram_endpoint(
             app,
             local_addr=('127.0.0.1', 0),
             remote_addr=('127.0.0.1', port)
         )
 
+        self.app_instances.get(id, []).append(app)
+
     def device_removed(self, id, type, port):
         super().device_removed(id, type, port)
 
-        if id in self.apps:
-            self.apps[id].disconnect()
+        if id in self.app_instances:
+            self.app_instances[id].disconnect()
             del self.apps[id]
-        elif '*' in self.apps:
-            self.apps['*'].disconnect()
-            del self.apps['*']
 
 @asyncio.coroutine
 def create_serialosc_connection(app_or_apps, loop=None):
