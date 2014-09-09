@@ -23,8 +23,6 @@
 import asyncio, aiosc
 import itertools
 
-__all__ = ['SerialOsc', 'Monome', 'BitBuffer']
-
 def pack_row(row):
     return row[7] << 7 | row[6] << 6 | row[5] << 5 | row[4] << 4 | row[3] << 3 | row[2] << 2 | row[1] << 1 | row[0]
 
@@ -68,7 +66,8 @@ class Monome(aiosc.OSCProtocol):
         self.send('/sys/info', self.host, self.port)
 
     def disconnect(self):
-        self.transport.close()
+        #self.transport.close()
+        pass
 
     def sys_info(self, addr, path, *args):
         if path == '/sys/id':
@@ -182,6 +181,9 @@ class BitBuffer:
         for y, s in enumerate(data):
             self.led_set(x, y_offset + y, s)
 
+    def clear(self):
+        self.led_all(0)
+
     def get_map(self, x_offset, y_offset):
         m = []
         for y in range(y_offset, y_offset + 8):
@@ -239,7 +241,7 @@ class PageCorner(Enum):
     bottom_left = 3
     bottom_right = 4
 
-class Pages(Monome):
+class PageManager(Monome):
     def __init__(self, pages, switch=PageCorner.top_right):
         super().__init__('/pages')
         self.pages = pages
@@ -272,9 +274,10 @@ class Pages(Monome):
     def grid_key(self, x, y, s):
         if (x, y) == self.switch_button:
             if s == 1:
-                # flush remaining presses
+                # send key-ups for currently pressed buttons
                 for x, y in self.pressed_buttons:
                     self.current_page.grid_key(x, y, 0)
+                self.pressed_buttons.clear()
                 # render selector page and set choose mode
                 self.switching = True
                 self.display_chooser()
@@ -285,20 +288,21 @@ class Pages(Monome):
                 # it still has to be sent to original page
                 self.leave_chooser()
             return
+        # handle regular buttons
         if self.switching:
-            pass # set current page based on coords
             if x < len(self.pages):
                 self.current_page = self.pages[x]
                 self.display_chooser()
             return
-        # remember pressed buttons so we can flush them later
         if s == 1:
+            # remember key-downs so we can up them later
             self.pressed_buttons.add((x, y))
+            self.current_page.grid_key(x, y, s)
         else:
-            # TODO: still getting KeyError here,
-            # make sure we track pushed buttons properly
-            self.pressed_buttons.remove((x, y))
-        self.current_page.grid_key(x, y, s)
+            # send key-ups if needed too
+            if (x, y) in self.pressed_buttons:
+                self.pressed_buttons.remove((x, y))
+                self.current_page.grid_key(x, y, s)
 
     def display_chooser(self):
         self.led_all(0)
@@ -372,7 +376,9 @@ class SerialOsc(BaseSerialOsc):
             remote_addr=('127.0.0.1', port)
         )
 
-        self.app_instances.get(id, []).append(app)
+        apps = self.app_instances.get(id, [])
+        apps.append(app)
+        self.app_instances[id] = apps
 
     def device_removed(self, id, type, port):
         super().device_removed(id, type, port)
