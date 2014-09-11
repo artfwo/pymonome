@@ -43,14 +43,14 @@ class HelloPage(monome.Page, Hello):
         monome.Page.ready(self)
         Hello.ready(self)
 
-class ExamplePages(monome.Pages):
+class ExamplePages(monome.PageManager):
     def __init__(self):
         super().__init__([
             FadersPage(self),
             LightsPage(self),
             LifePage(self),
             HelloPage(self),
-        ], monome.PageCorner.bottom_right)
+        ], switch=monome.PageCorner.bottom_right)
 
 loop = asyncio.get_event_loop()
 asyncio.async(monome.create_serialosc_connection(ExamplePages, loop=loop))

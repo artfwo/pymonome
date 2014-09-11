@@ -201,37 +201,41 @@ class Page:
         self.app = app
         self.intensity = 15
 
+    @property
+    def buffer(self):
+        return self.__buffer
+
     def ready(self):
-        self._buffer = BitBuffer(self.width, self.height)
+        self.__buffer = BitBuffer(self.width, self.height)
 
     def led_set(self, x, y, s):
-        self._buffer.led_set(x, y, s)
-        if self is self.app.current_page and not self.app.switching:
+        self.__buffer.led_set(x, y, s)
+        if self is self.app.current_page:
             self.app.led_set(x, y, s)
 
     def led_all(self, s):
-        self._buffer.led_all(s)
-        if self is self.app.current_page and not self.app.switching:
+        self.__buffer.led_all(s)
+        if self is self.app.current_page:
             self.app.led_all(s)
 
     def led_map(self, x_offset, y_offset, data):
-        self._buffer.led_map(x_offset, y_offset, data)
-        if self is self.app.current_page and not self.app.switching:
+        self.__buffer.led_map(x_offset, y_offset, data)
+        if self is self.app.current_page:
             self.app.led_map(x_offset, y_offset, data)
 
     def led_row(self, x_offset, y, data):
-        self._buffer.led_row(x_offset, y, data)
-        if self is self.app.current_page and not self.app.switching:
+        self.__buffer.led_row(x_offset, y, data)
+        if self is self.app.current_page:
             self.app.led_row(x_offset, y, data)
 
     def led_col(self, x, y_offset, data):
-        self._buffer.led_col(x, y_offset, data)
-        if self is self.app.current_page and not self.app.switching:
+        self.__buffer.led_col(x, y_offset, data)
+        if self is self.app.current_page:
             self.app.led_col(x, y_offset, data)
 
     def led_intensity(self, i):
         self.intensity = i
-        if self is self.app.current_page and not self.app.switching:
+        if self is self.app.current_page:
             self.app.led_intensity(i)
 
 from enum import Enum
@@ -241,20 +245,61 @@ class PageCorner(Enum):
     bottom_left = 3
     bottom_right = 4
 
-class PageManager(Monome):
-    def __init__(self, pages, switch=PageCorner.top_right):
-        super().__init__('/pages')
+class BasePageManager(Monome):
+    def __init__(self, pages, prefix='/manager'):
+        super().__init__(prefix)
         self.pages = pages
-        self.current_page = self.pages[0]
-        self.switching = False
         self.pressed_buttons = set()
+        self.current_page = self.pages[0]
+
+    def ready(self):
+        super().ready()
+        for page in self.pages:
+            page.width = self.width
+            page.height = self.height
+            page.ready()
+
+    def disconnect(self):
+        super().disconnect()
+        for page in self.pages:
+            page.disconnect()
+
+    def grid_key(self, x, y, s):
+        if s == 1:
+            # remember key-downs so we can up them later
+            self.pressed_buttons.add((x, y))
+            self.current_page.grid_key(x, y, s)
+        else:
+            # send key-ups if needed too
+            if (x, y) in self.pressed_buttons:
+                self.pressed_buttons.remove((x, y))
+                self.current_page.grid_key(x, y, s)
+
+    def switch_page(self, page_num):
+        # send key-ups to previously active page
+        if page_num == -1 or self.pages[page_num] is not self.current_page:
+            for x, y in self.pressed_buttons:
+                self.current_page.grid_key(x, y, 0)
+            self.pressed_buttons.clear()
+
+        if page_num == -1:
+            self.current_page = None
+            self.led_all(0)
+        else:
+            # render current page
+            self.current_page = self.pages[page_num]
+            for x_offset in [i * 8 for i in range(self.width // 8)]:
+                for y_offset in [i * 8 for i in range(self.height // 8)]:
+                    led_map = self.current_page.buffer.get_map(x_offset, y_offset)
+                    self.led_map(0, 0, led_map)
+
+class PageManager(BasePageManager):
+    def __init__(self, pages, prefix='/manager', switch=PageCorner.top_right):
+        super().__init__(pages, prefix)
         self.switch = switch
 
     def ready(self):
-        for p in self.pages:
-            p.width = self.width
-            p.height = self.height
-            p.ready()
+        super().ready()
 
         if self.switch == PageCorner.top_left:
             self.switch_button = (0, 0)
@@ -267,55 +312,28 @@ class PageManager(Monome):
         else:
             raise RuntimeError
 
-    def disconnect(self):
-        for p in self.pages:
-            p.disconnect()
-
     def grid_key(self, x, y, s):
         if (x, y) == self.switch_button:
             if s == 1:
-                # send key-ups for currently pressed buttons
-                for x, y in self.pressed_buttons:
-                    self.current_page.grid_key(x, y, 0)
-                self.pressed_buttons.clear()
-                # render selector page and set choose mode
-                self.switching = True
+                self.selected_page = self.pages.index(self.current_page)
+                self.switch_page(-1)
                 self.display_chooser()
             else:
-                self.switching = False
-                # TODO: ideally we only need to send key-ups if page changed
-                # but if non-page mode key-up happened during switching,
-                # it still has to be sent to original page
-                self.leave_chooser()
+                self.switch_page(self.selected_page)
             return
         # handle regular buttons
-        if self.switching:
+        if self.current_page is None:
             if x < len(self.pages):
-                self.current_page = self.pages[x]
+                self.selected_page = x
                 self.display_chooser()
             return
-        if s == 1:
-            # remember key-downs so we can up them later
-            self.pressed_buttons.add((x, y))
-            self.current_page.grid_key(x, y, s)
-        else:
-            # send key-ups if needed too
-            if (x, y) in self.pressed_buttons:
-                self.pressed_buttons.remove((x, y))
-                self.current_page.grid_key(x, y, s)
+        super().grid_key(x, y, s)
 
     def display_chooser(self):
         self.led_all(0)
         page_row = [1 if i < len(self.pages) else 0 for i in range(self.width)]
-        page_num = self.pages.index(self.current_page)
         self.led_row(0, self.height - 1, page_row)
-        self.led_col(page_num, 0, [1] * self.height)
-
-    def leave_chooser(self):
-        for x_offset in [i * 8 for i in range(self.width // 8)]:
-            for y_offset in [i * 8 for i in range(self.height // 8)]:
-                led_map = self.current_page._buffer.get_map(x_offset, y_offset)
-                self.led_map(0, 0, led_map)
+        self.led_col(self.selected_page, 0, [1] * self.height)
 
 class BaseSerialOsc(aiosc.OSCProtocol):
     def __init__(self):
