@@ -13,7 +13,12 @@ class Life(monome.Monome):
 
     def ready(self):
         self.world = [[0 for col in range(self.width)] for row in range(self.height)]
-        asyncio.async(self.begin())
+        self.task = asyncio.async(self.begin())
+
+    def disconnect(self):
+        super().disconnect()
+        self.task.cancel()
+        self.led_all(0)
 
     def grid_key(self, x, y, s):
         if x == self.width - 1 and y == 0 and s == 1:
@@ -32,7 +37,8 @@ class Life(monome.Monome):
         while True:
             if self.alive:
                 self.update()
-                self.led_map(0, 0, self.world)
+                for i, row in enumerate(self.world):
+                    self.led_row(0, i, row)
             yield from asyncio.sleep(0.2)
 
     def update(self):

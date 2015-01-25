@@ -8,8 +8,7 @@ class Hello(monome.Monome):
         super().__init__('/hello')
 
     def grid_key(self, x, y, s):
-        self.led_row(0, y, [s] * 8)
-        self.led_col(x, 0, [s] * 8)
+        self.led_set(x, y, s)
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()

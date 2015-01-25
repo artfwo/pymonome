@@ -20,31 +20,21 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import asyncio, aiosc
+import asyncio
+import aiosc
 import itertools
 
 def pack_row(row):
     return row[7] << 7 | row[6] << 6 | row[5] << 5 | row[4] << 4 | row[3] << 3 | row[2] << 2 | row[1] << 1 | row[0]
 
-def unpack_row(val):
-    return [
-        val & 1,
-        val >> 1 & 1,
-        val >> 2 & 1,
-        val >> 3 & 1,
-        val >> 4 & 1,
-        val >> 5 & 1,
-        val >> 6 & 1,
-        val >> 7 & 1
-    ]
-
 class Monome(aiosc.OSCProtocol):
-    def __init__(self, prefix='python'):
+    def __init__(self, prefix='python', varibright=True):
         self.prefix = prefix.strip('/')
         self.id = None
         self.width = None
         self.height = None
         self.rotation = None
+        self.varibright = varibright
 
         super().__init__(handlers={
             '/sys/disconnect': lambda *args: self.disconnect,
@@ -114,60 +104,71 @@ class Monome(aiosc.OSCProtocol):
         self.send('/{}/grid/led/intensity'.format(self.prefix), i)
 
     def led_level_set(self, x, y, l):
-        self.send('/{}/grid/led/level/set'.format(self.prefix), x, y, l)
+        if self.varibright:
+            self.send('/{}/grid/led/level/set'.format(self.prefix), x, y, l)
+        else:
+            self.led_set(x, y, l >> 3 & 1)
 
     def led_level_all(self, l):
-        self.send('/{}/grid/led/level/all'.format(self.prefix), l)
+        if self.varibright:
+            self.send('/{}/grid/led/level/all'.format(self.prefix), l)
+        else:
+            self.led_all(l >> 3 & 1)
 
     def led_level_map(self, x_offset, y_offset, data):
-        self.send('/{}/grid/led/level/map'.format(self.prefix), x_offset, y_offset, *data)
+        if self.varibright:
+            args = itertools.chain(*data)
+            self.send('/{}/grid/led/level/map'.format(self.prefix), x_offset, y_offset, *args)
+        else:
+            self.led_map(x_offset, y_offset, [[l >> 3 & 1 for l in row] for row in data])
 
     def led_level_row(self, x_offset, y, data):
-        self.send('/{}/grid/led/level/row'.format(self.prefix), x_offset, y, *data)
+        if self.varibright:
+            self.send('/{}/grid/led/level/row'.format(self.prefix), x_offset, y, *data)
+        else:
+            self.led_row(x_offset, y, [l >> 3 & 1 for l in data])
 
     def led_level_col(self, x, y_offset, data):
-        self.send('/{}/grid/led/level/col'.format(self.prefix), x, y_offset, *data)
+        if self.varibright:
+            self.send('/{}/grid/led/level/col'.format(self.prefix), x, y_offset, *data)
+        else:
+            self.led_col(x, y_offset, [l >> 3 & 1 for l in data])
 
     def tilt_set(self, n, s):
         self.send('/{}/tilt/set'.format(self.prefix), n, s)
 
-class BitBuffer:
+class LedBuffer:
     def __init__(self, width, height):
-        self.leds = [[0 for col in range(width)] for row in range(height)]
+        self.levels = [[0 for col in range(width)] for row in range(height)]
         self.width = width
         self.height = height
 
     def __and__(self, other):
-        result = BitBuffer(self.width, self.height)
+        result = LedBuffer(self.width, self.height)
         for row in range(self.height):
             for col in range(self.width):
-                result.leds[row][col] = self.leds[row][col] & other.leds[row][col]
+                result.levels[row][col] = self.levels[row][col] & other.levels[row][col]
         return result
 
     def __xor__(self, other):
-        result = BitBuffer(self.width, self.height)
+        result = LedBuffer(self.width, self.height)
         for row in range(self.height):
             for col in range(self.width):
-                result.leds[row][col] = self.leds[row][col] ^ other.leds[row][col]
+                result.levels[row][col] = self.levels[row][col] ^ other.levels[row][col]
         return result
 
     def __or__(self, other):
-        result = BitBuffer(self.width, self.height)
+        result = LedBuffer(self.width, self.height)
         for row in range(self.height):
             for col in range(self.width):
-                result.leds[row][col] = self.leds[row][col] | other.leds[row][col]
+                result.levels[row][col] = self.levels[row][col] | other.levels[row][col]
         return result
 
     def led_set(self, x, y, s):
-        if x < self.width and y < self.height:
-            row, col = y, x
-            self.leds[row][col] = s
+        self.led_level_set(x, y, s * 15)
 
     def led_all(self, s):
-        for x in range(self.width):
-            for y in range(self.height):
-                row, col = y, x
-                self.leds[row][col] = s
+        self.led_level_all(s * 15)
 
     def led_map(self, x_offset, y_offset, data):
         for r, row in enumerate(data):
@@ -181,75 +182,136 @@ class BitBuffer:
         for y, s in enumerate(data):
             self.led_set(x, y_offset + y, s)
 
-    def clear(self):
-        self.led_all(0)
+    def led_level_set(self, x, y, l):
+        if x < self.width and y < self.height:
+            self.levels[y][x] = l
 
-    def get_map(self, x_offset, y_offset):
-        m = []
+    def led_level_all(self, l):
+        for x in range(self.width):
+            for y in range(self.height):
+                self.levels[y][x] = l
+
+    def led_level_map(self, x_offset, y_offset, data):
+        for r, row in enumerate(data):
+            self.led_level_row(x_offset, y_offset + r, row)
+
+    def led_level_row(self, x_offset, y, data):
+        if y < self.height:
+            for x, l in enumerate(data[:self.width - x_offset]):
+                self.levels[y][x + x_offset] = l
+
+    def led_level_col(self, x, y_offset, data):
+        if x < self.width:
+            for y, s in enumerate(data[:self.height - y_offset]):
+                self.levels[y + y_offset][x] = l
+
+    def get_level_map(self, x_offset, y_offset):
+        map = []
         for y in range(y_offset, y_offset + 8):
-            row = [self.leds[y][col] for col in range(x_offset, x_offset + 8)]
-            m.append(row)
-        return m
+            row = [self.levels[y][col] for col in range(x_offset, x_offset + 8)]
+            map.append(row)
+        return map
+
+    def get_binary_map(self, x_offset, y_offset):
+        map = []
+        for y in range(y_offset, y_offset + 8):
+            row = [1 if self.levels[y][col] > 7 else 0 for col in range(x_offset, x_offset + 8)]
+            map.append(row)
+        return map
 
     def render(self, monome):
         for x_offset in [i * 8 for i in range(self.width // 8)]:
             for y_offset in [i * 8 for i in range(self.height // 8)]:
-                monome.led_map(x_offset, y_offset, self.get_map(x_offset, y_offset))
+                monome.led_level_map(x_offset, y_offset, self.get_level_map(x_offset, y_offset))
 
 class Page:
-    def __init__(self, app):
-        self.app = app
-        self.intensity = 15
+    def __init__(self, manager):
+        self.manager = manager
+        self.__buffer = None
+        self.__intensity = 15
 
     @property
     def buffer(self):
         return self.__buffer
 
     def ready(self):
-        self.__buffer = BitBuffer(self.width, self.height)
+        self.__buffer = LedBuffer(self.width, self.height)
+
+    def is_active(self):
+        return self is self.manager.current_page
+
+    # virtual pages shouldn't define stubs so they don't get
+    # in place of actual handlers with multiple inheritance
+    #def grid_key(self, x, y, s):
+    #    pass
+
+    #def disconnect(self):
+    #    pass
 
     def led_set(self, x, y, s):
         self.__buffer.led_set(x, y, s)
-        if self is self.app.current_page:
-            self.app.led_set(x, y, s)
+        if self.is_active():
+            self.manager.led_set(x, y, s)
 
     def led_all(self, s):
         self.__buffer.led_all(s)
-        if self is self.app.current_page:
-            self.app.led_all(s)
+        if self.is_active():
+            self.manager.led_all(s)
 
     def led_map(self, x_offset, y_offset, data):
         self.__buffer.led_map(x_offset, y_offset, data)
-        if self is self.app.current_page:
-            self.app.led_map(x_offset, y_offset, data)
+        if self.is_active():
+            self.manager.led_map(x_offset, y_offset, data)
 
     def led_row(self, x_offset, y, data):
         self.__buffer.led_row(x_offset, y, data)
-        if self is self.app.current_page:
-            self.app.led_row(x_offset, y, data)
+        if self.is_active():
+            self.manager.led_row(x_offset, y, data)
 
     def led_col(self, x, y_offset, data):
         self.__buffer.led_col(x, y_offset, data)
-        if self is self.app.current_page:
-            self.app.led_col(x, y_offset, data)
+        if self.is_active():
+            self.manager.led_col(x, y_offset, data)
 
     def led_intensity(self, i):
-        self.intensity = i
-        if self is self.app.current_page:
-            self.app.led_intensity(i)
+        self.__intensity = i
+        if self.is_active():
+            self.manager.led_intensity(i)
 
-from enum import Enum
-class PageCorner(Enum):
-    top_left = 1
-    top_right = 2
-    bottom_left = 3
-    bottom_right = 4
+    def led_level_set(self, x, y, l):
+        self.__buffer.led_level_set(x, y, l)
+        if self.is_active():
+            self.manager.led_level_set(x, y, l)
+
+    def led_level_all(self, x, y, l):
+        self.__buffer.led_level_all(x, y, l)
+        if self.is_active():
+            self.manager.led_level_all(x, y, l)
+
+    def led_level_map(self, x_offset, y_offset, data):
+        self.__buffer.led_level_map(x_offset, y_offset, data)
+        if self.is_active():
+            self.manager.led_level_map(x_offset, y_offset, data)
+
+    def led_level_row(self, x_offset, y, data):
+        self.__buffer.led_level_row(x_offset, y, data)
+        if self.is_active():
+            self.manager.led_level_row(x_offset, y, data)
+
+    def led_level_col(self, x, y_offset, data):
+        self.__buffer.led_level_col(x, y_offset, data)
+        if self.is_active():
+            self.manager.led_level_col(x, y_offset, data)
+
+    def render(self):
+        self.__buffer.render(self.manager)
+        self.manager.led_intensity(self.__intensity)
 
 class BasePageManager(Monome):
-    def __init__(self, pages, prefix='/manager'):
-        super().__init__(prefix)
+    def __init__(self, pages, **kwargs):
+        super().__init__(**kwargs)
         self.pages = pages
-        self.pressed_buttons = set()
+        self._presses = set()
         self.current_page = self.pages[0]
 
     def ready(self):
@@ -266,21 +328,18 @@ class BasePageManager(Monome):
 
     def grid_key(self, x, y, s):
         if s == 1:
-            # remember key-downs so we can up them later
-            self.pressed_buttons.add((x, y))
-            self.current_page.grid_key(x, y, s)
+            self._presses.add((x, y))
         else:
-            # send key-ups if needed too
-            if (x, y) in self.pressed_buttons:
-                self.pressed_buttons.remove((x, y))
-                self.current_page.grid_key(x, y, s)
+            self._presses.discard((x, y))
+
+        self.current_page.grid_key(x, y, s)
 
     def switch_page(self, page_num):
         # send key-ups to previously active page
         if page_num == -1 or self.pages[page_num] is not self.current_page:
-            for x, y in self.pressed_buttons:
+            for x, y in self._presses:
                 self.current_page.grid_key(x, y, 0)
-            self.pressed_buttons.clear()
+            self._presses.clear()
 
         if page_num == -1:
             self.current_page = None
@@ -288,32 +347,24 @@ class BasePageManager(Monome):
         else:
             # render current page
             self.current_page = self.pages[page_num]
-            for x_offset in [i * 8 for i in range(self.width // 8)]:
-                for y_offset in [i * 8 for i in range(self.height // 8)]:
-                    led_map = self.current_page.buffer.get_map(x_offset, y_offset)
-                    self.led_map(0, 0, led_map)
+            self.current_page.render()
 
-class PageManager(BasePageManager):
-    def __init__(self, pages, prefix='/manager', switch=PageCorner.top_right):
-        super().__init__(pages, prefix)
-        self.switch = switch
+class SumPageManager(BasePageManager):
+    def __init__(self, pages, switch_button=(-1, -1), **kwargs):
+        super().__init__(pages, **kwargs)
+        self.switch_button = switch_button
 
     def ready(self):
         super().ready()
+        switch_x, switch_y = self.switch_button
 
-        if self.switch == PageCorner.top_left:
-            self.switch_button = (0, 0)
-        elif self.switch == PageCorner.top_right:
-            self.switch_button = (self.width - 1, 0)
-        elif self.switch == PageCorner.bottom_left:
-            self.switch_button = (0, self.height - 1)
-        elif self.switch == PageCorner.bottom_right:
-            self.switch_button = (self.width - 1, self.height - 1)
-        else:
-            raise RuntimeError
+        self.switch_x = self.width + switch_x if switch_x < 0 else switch_x
+        self.switch_y = self.height + switch_y if switch_y < 0 else switch_y
 
     def grid_key(self, x, y, s):
-        if (x, y) == self.switch_button:
+        if not self._presses and \
+           x == self.switch_x and \
+           y == self.switch_y:
             if s == 1:
                 self.selected_page = self.pages.index(self.current_page)
                 self.switch_page(-1)
@@ -334,6 +385,28 @@ class PageManager(BasePageManager):
         page_row = [1 if i < len(self.pages) else 0 for i in range(self.width)]
         self.led_row(0, self.height - 1, page_row)
         self.led_col(self.selected_page, 0, [1] * self.height)
+
+class SeqPageManager(BasePageManager):
+    def __init__(self, pages, switch_button=(-1, -1), **kwargs):
+        super().__init__(pages, **kwargs)
+        self.switch_button = switch_button
+
+    def ready(self):
+        super().ready()
+        switch_x, switch_y = self.switch_button
+
+        self.switch_x = self.width + switch_x if switch_x < 0 else switch_x
+        self.switch_y = self.height + switch_y if switch_y < 0 else switch_y
+
+    def grid_key(self, x, y, s):
+        if not self._presses and \
+           x == self.switch_x and \
+           y == self.switch_y and \
+           s == 1:
+            self.switch_page((self.pages.index(self.current_page) + 1) % len(self.pages))
+        else:
+            super().grid_key(x, y, s)
+
 
 class BaseSerialOsc(aiosc.OSCProtocol):
     def __init__(self):
@@ -402,8 +475,9 @@ class SerialOsc(BaseSerialOsc):
         super().device_removed(id, type, port)
 
         if id in self.app_instances:
-            self.app_instances[id].disconnect()
-            del self.apps[id]
+            for app in self.app_instances[id]:
+                app.disconnect()
+            del self.app_instances[id]
 
 @asyncio.coroutine
 def create_serialosc_connection(app_or_apps, loop=None):

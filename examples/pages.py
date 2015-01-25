@@ -15,8 +15,8 @@ class FadersPage(monome.Page, Faders):
 
 from lights import Lights
 class LightsPage(monome.Page, Lights):
-    def __init__(self, app):
-        monome.Page.__init__(self, app)
+    def __init__(self, manager):
+        monome.Page.__init__(self, manager)
         Lights.__init__(self)
 
     def ready(self):
@@ -25,8 +25,8 @@ class LightsPage(monome.Page, Lights):
 
 from life import Life
 class LifePage(monome.Page, Life):
-    def __init__(self, app):
-        monome.Page.__init__(self, app)
+    def __init__(self, manager):
+        monome.Page.__init__(self, manager)
         Life.__init__(self)
 
     def ready(self):
@@ -35,22 +35,25 @@ class LifePage(monome.Page, Life):
 
 from hello import Hello
 class HelloPage(monome.Page, Hello):
-    def __init__(self, app):
-        monome.Page.__init__(self, app)
+    def __init__(self, manager):
+        monome.Page.__init__(self, manager)
         Hello.__init__(self)
 
     def ready(self):
         monome.Page.ready(self)
         Hello.ready(self)
 
-class ExamplePages(monome.PageManager):
+class ExamplePages(monome.SumPageManager):
     def __init__(self):
         super().__init__([
             FadersPage(self),
             LightsPage(self),
             LifePage(self),
             HelloPage(self),
-        ], switch=monome.PageCorner.bottom_right)
+        ])
+
+    def grid_key(self, x, y, s):
+        super().grid_key(x, y, s)
 
 loop = asyncio.get_event_loop()
 asyncio.async(monome.create_serialosc_connection(ExamplePages, loop=loop))
