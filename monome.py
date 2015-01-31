@@ -24,11 +24,25 @@ import asyncio
 import aiosc
 import itertools
 
+
 def pack_row(row):
     return row[7] << 7 | row[6] << 6 | row[5] << 5 | row[4] << 4 | row[3] << 3 | row[2] << 2 | row[1] << 1 | row[0]
 
+def unpack_row(val):
+    return [
+        val & 1,
+        val >> 1 & 1,
+        val >> 2 & 1,
+        val >> 3 & 1,
+        val >> 4 & 1,
+        val >> 5 & 1,
+        val >> 6 & 1,
+        val >> 7 & 1,
+    ]
+
+
 class Monome(aiosc.OSCProtocol):
-    def __init__(self, prefix='python', varibright=True):
+    def __init__(self, prefix='/python', varibright=True):
         self.prefix = prefix.strip('/')
         self.id = None
         self.width = None
@@ -137,6 +151,7 @@ class Monome(aiosc.OSCProtocol):
     def tilt_set(self, n, s):
         self.send('/{}/tilt/set'.format(self.prefix), n, s)
 
+
 class LedBuffer:
     def __init__(self, width, height):
         self.levels = [[0 for col in range(width)] for row in range(height)]
@@ -223,6 +238,7 @@ class LedBuffer:
         for x_offset in [i * 8 for i in range(self.width // 8)]:
             for y_offset in [i * 8 for i in range(self.height // 8)]:
                 monome.led_level_map(x_offset, y_offset, self.get_level_map(x_offset, y_offset))
+
 
 class Page:
     def __init__(self, manager):
@@ -478,6 +494,7 @@ class SerialOsc(BaseSerialOsc):
             for app in self.app_instances[id]:
                 app.disconnect()
             del self.app_instances[id]
+
 
 @asyncio.coroutine
 def create_serialosc_connection(app_or_apps, loop=None):
