@@ -1,1 +1,3 @@
+v0.8.1, 7 Feb 2015 -- Rewritten for asyncio/aiosc.
+
 v0.1dev, 1 Jan 2013 -- Initial release to pypi

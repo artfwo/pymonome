@@ -1,15 +1,30 @@
-from distutils.core import setup
+#! /usr/bin/env python3
+
+from setuptools import setup
+
+with open('README.rst') as file:
+    long_description = file.read()
 
 setup(
     name='pymonome',
-    version='0.2.3',
-    py_modules=['monome'],
     author='Artem Popov',
-    url='http://pypi.python.org/pypi/pymonome',
+    author_email='artfwo@gmail.com',
+    url='https://github.com/artfwo/pymonome',
     description='a monome serialosc client in python',
-    long_description=open('README').read(),
+    long_description=long_description,
+    version='0.8.1',
+    py_modules=['monome'],
+    include_package_data=True,
     install_requires=[
-        "pyOSC >= 0.3",
-        "pybonjour >= 1.1.1",
+        'aiosc'
     ],
+    classifiers=[
+        'Development Status :: 4 - Beta',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: MIT License',
+        'Programming Language :: Python :: 3',
+        'Topic :: Multimedia :: Sound/Audio',
+        'Topic :: Software Development :: Libraries',
+    ],
+    license='MIT'
 )
