@@ -217,7 +217,7 @@ class LedBuffer:
 
     def led_level_col(self, x, y_offset, data):
         if x < self.width:
-            for y, s in enumerate(data[:self.height - y_offset]):
+            for y, l in enumerate(data[:self.height - y_offset]):
                 self.levels[y + y_offset][x] = l
 
     def get_level_map(self, x_offset, y_offset):
