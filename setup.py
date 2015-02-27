@@ -12,7 +12,7 @@ setup(
     url='https://github.com/artfwo/pymonome',
     description='a monome serialosc client in python',
     long_description=long_description,
-    version='0.8.1',
+    version='0.8.2',
     py_modules=['monome'],
     include_package_data=True,
     install_requires=[
