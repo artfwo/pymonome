@@ -23,7 +23,7 @@
 import asyncio
 import aiosc
 import itertools
-
+import re
 
 def pack_row(row):
     return row[7] << 7 | row[6] << 6 | row[5] << 5 | row[4] << 4 | row[3] << 3 | row[2] << 2 | row[1] << 1 | row[0]
@@ -42,13 +42,13 @@ def unpack_row(val):
 
 
 class Monome(aiosc.OSCProtocol):
-    def __init__(self, prefix='/python', varibright=True):
+    def __init__(self, prefix='/python'):
         self.prefix = prefix.strip('/')
         self.id = None
         self.width = None
         self.height = None
         self.rotation = None
-        self.varibright = varibright
+        self.varibright = False
 
         super().__init__(handlers={
             '/sys/disconnect': lambda *args: self.disconnect,
@@ -84,6 +84,8 @@ class Monome(aiosc.OSCProtocol):
         # in case rotation, etc. changes
         # Note: arc will report 0, 0 for its size
         if all(x is not None for x in [self.id, self.width, self.height, self.rotation]):
+            if re.match('^m\d+$', self.id):
+                self.varibright = True
             self.ready()
 
     def ready(self):
