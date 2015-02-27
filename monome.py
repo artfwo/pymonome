@@ -70,8 +70,7 @@ class Monome(aiosc.OSCProtocol):
         self.send('/sys/info', self.host, self.port)
 
     def disconnect(self):
-        #self.transport.close()
-        pass
+        self.transport.close()
 
     def sys_info(self, addr, path, *args):
         if path == '/sys/id':
