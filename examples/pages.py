@@ -52,9 +52,6 @@ class ExamplePages(monome.SumPageManager):
             HelloPage(self),
         ])
 
-    def grid_key(self, x, y, s):
-        super().grid_key(x, y, s)
-
 loop = asyncio.get_event_loop()
 asyncio.async(monome.create_serialosc_connection(ExamplePages, loop=loop))
 

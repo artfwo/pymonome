@@ -300,10 +300,10 @@ class Page:
         if self.is_active():
             self.manager.led_level_set(x, y, l)
 
-    def led_level_all(self, x, y, l):
-        self.__buffer.led_level_all(x, y, l)
+    def led_level_all(self, l):
+        self.__buffer.led_level_all(l)
         if self.is_active():
-            self.manager.led_level_all(x, y, l)
+            self.manager.led_level_all(l)
 
     def led_level_map(self, x_offset, y_offset, data):
         self.__buffer.led_level_map(x_offset, y_offset, data)
@@ -423,6 +423,84 @@ class SeqPageManager(BasePageManager):
             self.switch_page((self.pages.index(self.current_page) + 1) % len(self.pages))
         else:
             super().grid_key(x, y, s)
+
+
+class Section:
+    def __init__(self, splitter, size, offset):
+        self.splitter = splitter
+        self.part_width = size[0]
+        self.part_height = size[1]
+        self.part_offset_x = offset[0]
+        self.part_offset_y = offset[1]
+
+    def ready(self):
+        self.width = self.part_width
+        self.height = self.part_height
+
+    def led_set(self, x, y, s):
+        if x < self.part_width and y < self.part_height:
+            self.splitter.led_set(x + self.part_offset_x, y + self.part_offset_y, s)
+
+    def led_all(self, s):
+        # TODO: fix map
+        data = [[s for col in range(8)] for row in range(8)]
+        self.splitter.led_map(self.part_offset_x, self.part_offset_y, data)
+
+    def led_map(self, x_offset, y_offset, data):
+        self.splitter.led_map(self.part_offset_x + x_offset, self.part_offset_y + y_offset, data)
+
+    def led_row(self, x_offset, y, data):
+        data = data[:self.part_width]
+        self.splitter.led_row(self.part_offset_x + x_offset, self.part_offset_y + y, data)
+
+    def led_col(self, x, y_offset, data):
+        data = data[:self.part_height]
+        self.splitter.led_col(self.part_offset_x + x, self.part_offset_y + y_offset, data)
+
+    def led_intensity(self, i):
+        self.splitter.led_intensity(i)
+
+    def led_level_set(self, x, y, l):
+        if x < self.part_width and y < self.part_height:
+            self.splitter.led_level_set(self.part_offset_x + x, self.part_offset_y + y, l)
+
+    def led_level_all(self, l):
+        data = [[l for col in range(8)] for row in range(8)]
+        self.splitter.led_map(self.part_offset_x, self.part_offset_y, data)
+
+    def led_level_map(self, x_offset, y_offset, data):
+        self.splitter.led_level_map(self.part_offset_x + x_offset, self.part_offset_y + y_offset, data)
+
+    def led_level_row(self, x_offset, y, data):
+        data = data[:self.part_width]
+        self.splitter.led_level_row(self.part_offset_x + x_offset, self.part_offset_y + y, data)
+
+    def led_level_col(self, x, y_offset, data):
+        data = data[:self.part_height]
+        self.splitter.led_level_col(self.part_offset_x + x, self.part_offset_y + y_offset, data)
+
+class Splitter(Monome):
+    def __init__(self, sections, **kwargs):
+        super().__init__(**kwargs)
+        self.sections = sections
+
+    def ready(self):
+        super().ready()
+        for part in self.sections:
+            #app.width = size[0]
+            #app.height = size[1]
+            part.ready()
+
+    def disconnect(self):
+        super().disconnect()
+        for part in self.sections:
+            part.disconnect()
+
+    def grid_key(self, x, y, s):
+        for part in self.sections:
+            if part.part_offset_x <= x < part.part_offset_x + part.part_width and \
+               part.part_offset_y <= y < part.part_offset_y + part.part_height:
+                part.grid_key(x - part.part_offset_x, y - part.part_offset_y, s)
 
 
 class BaseSerialOsc(aiosc.OSCProtocol):
