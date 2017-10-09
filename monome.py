@@ -554,9 +554,8 @@ class SerialOsc(BaseSerialOsc):
         elif '*' in self.app_factories:
             asyncio.async(self.autoconnect(id, self.app_factories['*'], port))
 
-    @asyncio.coroutine
-    def autoconnect(self, id, app, port):
-        transport, app = yield from self.loop.create_datagram_endpoint(
+    async def autoconnect(self, id, app, port):
+        transport, app = await self.loop.create_datagram_endpoint(
             app,
             local_addr=('127.0.0.1', 0),
             remote_addr=('127.0.0.1', port)
@@ -575,8 +574,7 @@ class SerialOsc(BaseSerialOsc):
             del self.app_instances[id]
 
 
-@asyncio.coroutine
-def create_serialosc_connection(app_or_apps, loop=None):
+async def create_serialosc_connection(app_or_apps, loop=None):
     if isinstance(app_or_apps, dict):
         apps = app_or_apps
     else:
@@ -585,7 +583,7 @@ def create_serialosc_connection(app_or_apps, loop=None):
     if loop is None:
         loop = asyncio.get_event_loop()
 
-    transport, serialosc = yield from loop.create_datagram_endpoint(
+    transport, serialosc = await loop.create_datagram_endpoint(
         lambda: SerialOsc(apps),
         local_addr=('127.0.0.1', 0),
         remote_addr=('127.0.0.1', 12002)

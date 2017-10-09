@@ -34,8 +34,7 @@ class Faders(monome.Monome):
     def row_to_value(self, row):
         return self.row_values[self.height - 1 - row]
 
-    @asyncio.coroutine
-    def fade_to(self, x, new_value):
+    async def fade_to(self, x, new_value):
         while self.values[x] != new_value:
             if self.values[x] < new_value:
                 self.values[x] += 1
@@ -44,7 +43,7 @@ class Faders(monome.Monome):
             col = [0 if c > self.value_to_row(self.values[x]) else 1 for c in range(self.height)]
             col.reverse()
             self.led_col(x, 0, col)
-            yield from asyncio.sleep(1/100)
+            await asyncio.sleep(1/100)
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()

@@ -11,11 +11,10 @@ class Monobright(monome.Monome):
     def __init__(self):
         super().__init__('/hello', varibright=False)
 
-    @asyncio.coroutine
-    def light(self, x, y):
+    async def light(self, x, y):
         for i in range(16):
             self.led_level_set(x, y, i)
-            yield from asyncio.sleep(0.1)
+            await asyncio.sleep(0.1)
 
     def grid_key(self, x, y, s):
         if s == 1:

@@ -20,21 +20,20 @@ class Lights(monome.Monome):
         self.alive = False
         super().disconnect(*args)
 
-    @asyncio.coroutine
-    def animate(self):
+    async def animate(self):
         while self.alive:
             for i in range(self.height):
                 row = [random.randint(0, 1) for i in range(self.width)]
                 for j in range(3):
                     self.led_row(0, i, [0] * self.width)
-                    yield from asyncio.sleep(1 / 30)
+                    await asyncio.sleep(1 / 30)
                     self.led_row(0, i, row)
-                    yield from asyncio.sleep(1 / 30)
+                    await asyncio.sleep(1 / 30)
             for i in reversed(range(self.height)):
                 row = [random.randint(0, 1) for i in range(self.width)]
                 self.led_row(0, i, row)
-                yield from asyncio.sleep(1 / 20)
-            yield from asyncio.sleep(2)
+                await asyncio.sleep(1 / 20)
+            await asyncio.sleep(2)
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()

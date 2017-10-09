@@ -32,14 +32,13 @@ class Life(monome.Monome):
         else:
             pass
 
-    @asyncio.coroutine
-    def begin(self):
+    async def begin(self):
         while True:
             if self.alive:
                 self.update()
                 for i, row in enumerate(self.world):
                     self.led_row(0, i, row)
-            yield from asyncio.sleep(0.2)
+            await asyncio.sleep(0.2)
 
     def update(self):
         def neighbors(x, y):
