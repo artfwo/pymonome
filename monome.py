@@ -25,42 +25,58 @@ import aiosc
 import itertools
 import re
 
+
+DISCONNECTED, CONNECTING, READY = range(3)
+
 def pack_row(row):
     return row[7] << 7 | row[6] << 6 | row[5] << 5 | row[4] << 4 | row[3] << 3 | row[2] << 2 | row[1] << 1 | row[0]
 
 
-class Monome(aiosc.OSCProtocol):
-    def __init__(self, prefix='/python'):
+class Grid(aiosc.OSCProtocol):
+    def __init__(self, prefix='/pymonome'):
         self.prefix = prefix.strip('/')
         self.id = None
         self.width = None
         self.height = None
-        self.rotation = None
-        self.varibright = False
+        self.varibright = True
+        self.state = DISCONNECTED
 
         super().__init__(handlers={
-            '/sys/disconnect': lambda *args: self.disconnect,
-            #'/sys/connect': lambda *args: self.connect,
-            '/sys/{id,size,host,port,prefix,rotation}': self.sys_info,
-            '/{}/grid/key'.format(self.prefix): lambda addr, path, x, y, s: self.grid_key(x, y, s),
-            '/{}/tilt'.format(self.prefix): lambda addr, path, n, x, y, z: self.tilt(n, x, y, z),
+            '/sys/connect': lambda *args: self.__sys_connect,
+            '/sys/disconnect': lambda *args: self.__sys_disconnect,
+            '/sys/{id,size,host,port,prefix,rotation}': self.__sys_info,
+            '/{}/grid/key'.format(self.prefix): self.__grid_key,
+            '/{}/tilt'.format(self.prefix): self.__tilt,
         })
+
+        self.event_handler = None
 
     def connection_made(self, transport):
         super().connection_made(transport)
         self.host, self.port = transport.get_extra_info('sockname')
-        self.connect()
 
     def connect(self):
-        self.send('/sys/host', self.host)
-        self.send('/sys/port', self.port)
-        self.send('/sys/prefix', self.prefix)
-        self.send('/sys/info', self.host, self.port)
+        if self.state == DISCONNECTED:
+            self.state = CONNECTING
+            self.send('/sys/host', self.host)
+            self.send('/sys/port', self.port)
+            self.send('/sys/prefix', self.prefix)
+            #self.send('/sys/info', self.host, self.port)
+            self.send('/sys/info/id', self.host, self.port)
+            self.send('/sys/info/size', self.host, self.port)
 
-    def disconnect(self):
+    def __sys_connect(self):
+        # TODO: shouldn't normally happen, because we close the socket on disconnect
+        pass
+
+    def __sys_disconnect(self):
+        self.state = DISCONNECTED
         self.transport.close()
 
-    def sys_info(self, addr, path, *args):
+        if self.event_handler is not None:
+            self.event_handler.on_grid_ready()
+
+    def __sys_info(self, addr, path, *args):
         if path == '/sys/id':
             self.id = args[0]
         elif path == '/sys/size':
@@ -68,22 +84,25 @@ class Monome(aiosc.OSCProtocol):
         elif path == '/sys/rotation':
             self.rotation = args[0]
 
-        # TODO: refine conditions for reinitializing
-        # in case rotation, etc. changes
-        # Note: arc will report 0, 0 for its size
-        if all(x is not None for x in [self.id, self.width, self.height, self.rotation]):
-            if re.match('^m\d+$', self.id):
-                self.varibright = True
-            self.ready()
+        if all(x is not None for x in [self.id, self.width, self.height]):
+            self.state = READY
 
-    def ready(self):
-        pass
+            if not re.match('^m\d+$', self.id):
+                self.varibright = False
 
-    def grid_key(self, x, y, s):
-        pass
+            self.__ready()
 
-    def tilt(self, n, x, y, z):
-        pass
+    def __ready(self):
+        if self.event_handler is not None:
+            self.event_handler.on_grid_ready()
+
+    def __grid_key(self, addr, path, x, y, s):
+        if self.event_handler is not None:
+            self.event_handler.on_grid_key(x, y, s)
+
+    def __tilt(self, addr, path, n, x, y, z):
+        if self.event_handler is not None:
+            self.event_handler_on_tilt(n, x, y, z)
 
     def led_set(self, x, y, s):
         self.send('/{}/grid/led/set'.format(self.prefix), x, y, s)
@@ -139,6 +158,7 @@ class Monome(aiosc.OSCProtocol):
 
     def tilt_set(self, n, s):
         self.send('/{}/tilt/set'.format(self.prefix), n, s)
+
 
 
 class LedBuffer:
@@ -312,7 +332,7 @@ class Page:
         self.__buffer.render(self.manager)
         self.manager.led_intensity(self.__intensity)
 
-class BasePageManager(Monome):
+class BasePageManager(Grid):
     def __init__(self, pages, **kwargs):
         super().__init__(**kwargs)
         self.pages = pages
@@ -467,7 +487,7 @@ class Section:
         data = data[:self.part_height]
         self.splitter.led_level_col(self.part_offset_x + x, self.part_offset_y + y_offset, data)
 
-class Splitter(Monome):
+class Splitter(Grid):
     def __init__(self, sections, **kwargs):
         super().__init__(**kwargs)
         self.sections = sections
@@ -491,14 +511,28 @@ class Splitter(Monome):
                 part.grid_key(x - part.part_offset_x, y - part.part_offset_y, s)
 
 
-class BaseSerialOsc(aiosc.OSCProtocol):
-    def __init__(self):
+class SerialOsc(aiosc.OSCProtocol):
+    def __init__(self, loop=None, autoconnect_app=None):
         super().__init__(handlers={
-            '/serialosc/device': self.serialosc_device,
-            '/serialosc/add': self.serialosc_add,
-            '/serialosc/remove': self.serialosc_remove,
+            '/serialosc/device': self.__on_serialosc_device,
+            '/serialosc/add': self.__on_serialosc_add,
+            '/serialosc/remove': self.__on_serialosc_remove,
         })
-        self.devices = {}
+
+        if loop is None:
+            loop = asyncio.get_event_loop()
+        self._loop = loop
+
+        self.autoconnect_app = autoconnect_app
+
+    @classmethod
+    async def create(cls, loop=None, autoconnect_app=None):
+        if loop is None:
+            loop = asyncio.get_event_loop()
+
+        transport, protocol = await loop.create_datagram_endpoint(lambda: cls(loop=loop, autoconnect_app=autoconnect_app),
+            local_addr=('127.0.0.1', 0), remote_addr=('127.0.0.1', 12002))
+        return protocol
 
     def connection_made(self, transport):
         super().connection_made(transport)
@@ -507,73 +541,50 @@ class BaseSerialOsc(aiosc.OSCProtocol):
         self.send('/serialosc/list', self.host, self.port)
         self.send('/serialosc/notify', self.host, self.port)
 
-    def device_added(self, id, type, port):
-        self.devices[id] = port
+    def __on_serialosc_device(self, addr, path, id, type, port):
+        self.on_device_added(id, type, port)
 
-    def device_removed(self, id, type, port):
-        del self.devices[id]
-
-    def serialosc_device(self, addr, path, id, type, port):
-        self.device_added(id, type, port)
-
-    def serialosc_add(self, addr, path, id, type, port):
-        self.device_added(id, type, port)
+    def __on_serialosc_add(self, addr, path, id, type, port):
+        self.on_device_added(id, type, port)
         self.send('/serialosc/notify', self.host, self.port)
 
-    def serialosc_remove(self, addr, path, id, type, port):
-        self.device_removed(id, type, port)
+    def __on_serialosc_remove(self, addr, path, id, type, port):
+        self.on_device_removed(id, type, port)
         self.send('/serialosc/notify', self.host, self.port)
 
-class SerialOsc(BaseSerialOsc):
-    def __init__(self, app_factories, loop=None):
-        super().__init__()
-        self.app_factories = app_factories
-        self.app_instances = {}
+    def on_device_added(self, id, type, port):
+        if self.autoconnect_app is not None:
+            asyncio.async(self.autoconnect(self.autoconnect_app, port))
 
-        if loop is None:
-            loop = asyncio.get_event_loop()
-        self.loop = loop
+    def on_device_removed(self, id, type, port):
+        pass
 
-    def device_added(self, id, type, port):
-        super().device_added(id, type, port)
+    async def autoconnect(self, app, grid_port):
+        transport, grid = await self._loop.create_datagram_endpoint(Grid,
+            local_addr=('127.0.0.1', 0), remote_addr=('127.0.0.1', grid_port))
 
-        if id in self.app_factories:
-            asyncio.async(self.autoconnect(id, self.app_factories[id], port))
-        elif '*' in self.app_factories:
-            asyncio.async(self.autoconnect(id, self.app_factories['*'], port))
+        app.attach(grid)
 
-    async def autoconnect(self, id, app, port):
-        transport, app = await self.loop.create_datagram_endpoint(
-            app,
-            local_addr=('127.0.0.1', 0),
-            remote_addr=('127.0.0.1', port)
-        )
+class App:
+    def __init__(self):
+        # TODO: prefix
+        self.grid = None
 
-        apps = self.app_instances.get(id, [])
-        apps.append(app)
-        self.app_instances[id] = apps
+    def attach(self, grid):
+        # TODO: should this happen before or after we connect?
+        self.grid = grid
+        self.grid.event_handler = self
+        self.grid.connect()
 
-    def device_removed(self, id, type, port):
-        super().device_removed(id, type, port)
+    def detach(self):
+        self.grid.event_handler = None
+        self.grid = None
 
-        if id in self.app_instances:
-            for app in self.app_instances[id]:
-                app.disconnect()
-            del self.app_instances[id]
+    def on_grid_ready(self):
+        pass
 
+    def on_grid_disconnect(self):
+        self.detach()
 
-async def create_serialosc_connection(app_or_apps, loop=None):
-    if isinstance(app_or_apps, dict):
-        apps = app_or_apps
-    else:
-        apps = {'*': app_or_apps}
-
-    if loop is None:
-        loop = asyncio.get_event_loop()
-
-    transport, serialosc = await loop.create_datagram_endpoint(
-        lambda: SerialOsc(apps),
-        local_addr=('127.0.0.1', 0),
-        remote_addr=('127.0.0.1', 12002)
-    )
-    return serialosc
+    def on_grid_key(self, x, y, s):
+        pass
