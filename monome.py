@@ -28,18 +28,6 @@ import re
 def pack_row(row):
     return row[7] << 7 | row[6] << 6 | row[5] << 5 | row[4] << 4 | row[3] << 3 | row[2] << 2 | row[1] << 1 | row[0]
 
-def unpack_row(val):
-    return [
-        val & 1,
-        val >> 1 & 1,
-        val >> 2 & 1,
-        val >> 3 & 1,
-        val >> 4 & 1,
-        val >> 5 & 1,
-        val >> 6 & 1,
-        val >> 7 & 1,
-    ]
-
 
 class Monome(aiosc.OSCProtocol):
     def __init__(self, prefix='/python'):
