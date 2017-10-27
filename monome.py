@@ -161,7 +161,7 @@ class Grid(aiosc.OSCProtocol):
 
 
 
-class LedBuffer:
+class GridBuffer:
     def __init__(self, width, height):
         self.levels = [[0 for col in range(width)] for row in range(height)]
         self.width = width
@@ -243,10 +243,10 @@ class LedBuffer:
             map.append(row)
         return map
 
-    def render(self, monome):
+    def render(self, grid):
         for x_offset in [i * 8 for i in range(self.width // 8)]:
             for y_offset in [i * 8 for i in range(self.height // 8)]:
-                monome.led_level_map(x_offset, y_offset, self.get_level_map(x_offset, y_offset))
+                grid.led_level_map(x_offset, y_offset, self.get_level_map(x_offset, y_offset))
 
 
 class Page:
