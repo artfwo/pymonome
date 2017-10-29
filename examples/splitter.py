@@ -3,37 +3,40 @@
 import asyncio
 import monome
 
-from faders import Faders
-class FadersPart(monome.Section, Faders):
-    def __init__(self, splitter, size, offset):
-        monome.Section.__init__(self, splitter, size, offset)
-        Faders.__init__(self)
+from life import Life
 
-    def ready(self):
-        monome.Section.ready(self)
-        Faders.ready(self)
+class SplitterSerialOsc(monome.SerialOsc):
+    def __init__(self, app1, app2, loop=None, autoconnect_app=None):
+        super().__init__(loop, autoconnect_app)
+        self.app1 = app1
+        self.app2 = app2
 
-from lights import Lights
-class LightsPart(monome.Section, Lights):
-    def __init__(self, splitter, size, offset):
-        monome.Section.__init__(self, splitter, size, offset)
-        Lights.__init__(self)
+    async def splitter_connect(self, port):
+        transport, grid = await self.loop.create_datagram_endpoint(monome.Grid, local_addr=('127.0.0.1', 0), remote_addr=('127.0.0.1', port))
 
-    def ready(self):
-        monome.Section.ready(self)
-        Lights.ready(self)
+        section1 = monome.GridSection((8, 8), (0, 0))
+        section2 = monome.GridSection((8, 8), (8, 0))
+        splitter = monome.Splitter(grid, [section1, section2])
 
-class ExampleSplitter(monome.Splitter):
-    def __init__(self):
-        super().__init__([
-            FadersPart(self, size=(8,8), offset=(0,0)),
-            LightsPart(self, size=(8,8), offset=(8,0)),
-        ])
+        self.app1.attach(section1)
+        self.app2.attach(section2)
 
-loop = asyncio.get_event_loop()
-asyncio.async(monome.create_serialosc_connection(ExampleSplitter, loop=loop))
+        splitter.connect()
 
-try:
-    loop.run_forever()
-except KeyboardInterrupt:
-    print('kthxbye')
+    def on_device_added(self, id, type, port):
+        if type == "monome 128":
+            asyncio.async(self.splitter_connect(port))
+
+if __name__ == "__main__":
+    life1 = Life()
+    life2 = Life()
+
+    loop = asyncio.get_event_loop()
+    asyncio.async(SplitterSerialOsc.create(loop=loop, app1=life1, app2=life2))
+
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        life1.quit()
+        life2.quit()
+
