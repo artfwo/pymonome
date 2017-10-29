@@ -45,8 +45,8 @@ class Grid(aiosc.OSCProtocol):
             '/sys/connect': lambda *args: self.__sys_connect(),
             '/sys/disconnect': lambda *args: self.__sys_disconnect(),
             '/sys/{id,size,host,port,prefix,rotation}': self.__sys_info,
-            '/{}/grid/key'.format(self.prefix): self.__grid_key,
-            '/{}/tilt'.format(self.prefix): self.__tilt,
+            '/*/grid/key'.format(self.prefix): self.__grid_key,
+            '/*/tilt'.format(self.prefix): self.__tilt,
         })
 
         self.event_handler = None
@@ -97,11 +97,11 @@ class Grid(aiosc.OSCProtocol):
             self.event_handler.on_grid_ready()
 
     def __grid_key(self, addr, path, x, y, s):
-        if self.event_handler is not None:
+        if self.event_handler is not None and path.startswith("/" + self.prefix):
             self.event_handler.on_grid_key(x, y, s)
 
     def __tilt(self, addr, path, n, x, y, z):
-        if self.event_handler is not None:
+        if self.event_handler is not None and path.startswith("/" + self.prefix):
             self.event_handler_on_tilt(n, x, y, z)
 
     def led_set(self, x, y, s):
