@@ -30,6 +30,7 @@ class Life(monome.App):
             self.grid.led_set(x, y, self.world[row][col])
 
     def quit(self):
+        self.grid.led_all(0)
         self.task.cancel()
 
     async def begin(self):
