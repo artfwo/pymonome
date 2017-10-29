@@ -33,8 +33,8 @@ def pack_row(row):
 
 
 class Grid(aiosc.OSCProtocol):
-    def __init__(self, prefix='/pymonome'):
-        self.prefix = prefix.strip('/')
+    def __init__(self):
+        self.prefix = 'monome'
         self.id = None
         self.width = None
         self.height = None
@@ -619,14 +619,15 @@ class SerialOsc(aiosc.OSCProtocol):
         app.attach(grid)
 
 class App:
-    def __init__(self):
-        # TODO: prefix
+    def __init__(self, prefix='/monome'):
+        self.prefix = prefix.strip('/')
         self.grid = None
 
     def attach(self, grid):
         # TODO: should this happen before or after we connect?
         self.grid = grid
         self.grid.event_handler = self
+        self.grid.prefix = self.prefix
         self.grid.connect()
 
     def detach(self):
