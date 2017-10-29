@@ -613,7 +613,7 @@ class SerialOsc(aiosc.OSCProtocol):
         pass
 
     async def autoconnect(self, app, grid_port):
-        transport, grid = await self._loop.create_datagram_endpoint(Grid,
+        transport, grid = await self.loop.create_datagram_endpoint(Grid,
             local_addr=('127.0.0.1', 0), remote_addr=('127.0.0.1', grid_port))
 
         app.attach(grid)
