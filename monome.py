@@ -42,8 +42,8 @@ class Grid(aiosc.OSCProtocol):
         self.state = DISCONNECTED
 
         super().__init__(handlers={
-            '/sys/connect': lambda *args: self.__sys_connect,
-            '/sys/disconnect': lambda *args: self.__sys_disconnect,
+            '/sys/connect': lambda *args: self.__sys_connect(),
+            '/sys/disconnect': lambda *args: self.__sys_disconnect(),
             '/sys/{id,size,host,port,prefix,rotation}': self.__sys_info,
             '/{}/grid/key'.format(self.prefix): self.__grid_key,
             '/{}/tilt'.format(self.prefix): self.__tilt,
@@ -74,7 +74,7 @@ class Grid(aiosc.OSCProtocol):
         self.transport.close()
 
         if self.event_handler is not None:
-            self.event_handler.on_grid_ready()
+            self.event_handler.on_grid_disconnect()
 
     def __sys_info(self, addr, path, *args):
         if path == '/sys/id':
