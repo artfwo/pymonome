@@ -160,6 +160,65 @@ class Grid(aiosc.OSCProtocol):
         self.send('/{}/tilt/set'.format(self.prefix), n, s)
 
 
+class GridWrapper:
+    def __init__(self, grid):
+        self.grid = grid
+        self.grid.event_handler = self
+        self.event_handler = None
+
+    def connect(self):
+        if self.grid.connection_state == DISCONNECTED:
+            self.grid.connect()
+        elif self.grid.connection_state == CONNECTED:
+            self.on_grid_ready()
+
+    def on_grid_ready(self):
+        self.width = self.grid.width
+        self.height = self.grid.height
+        self.event_handler.on_grid_ready()
+
+    def on_grid_key(self, x, y, s):
+        self.event_handler.on_grid_key(x, y, s)
+
+    def on_grid_disconnect(self):
+        self.event_handler.on_grid_disconnect()
+
+    def led_set(self, x, y, s):
+        self.grid.led_set(x, y, s)
+
+    def led_all(self, s):
+        self.grid.led_all(s)
+
+    def led_map(self, x_offset, y_offset, data):
+        self.grid.led_map(x_offset, y_offset, data)
+
+    def led_row(self, x_offset, y, data):
+        self.grid.led_row(x_offset, y, data)
+
+    def led_col(self, x, y_offset, data):
+        self.grid.led_col(x, y_offset, data)
+
+    def led_intensity(self, i):
+        self.grid.led_intensity(i)
+
+    def led_level_set(self, x, y, l):
+        self.grid.led_level_set(x, y, l)
+
+    def led_level_all(self, l):
+        self.grid.led_level_all(l)
+
+    def led_level_map(self, x_offset, y_offset, data):
+        self.grid.led_level_map(x_offset, y_offset, data)
+
+    def led_level_row(self, x_offset, y, data):
+        self.grid.led_level_row(x_offset, y, data)
+
+    def led_level_col(self, x, y_offset, data):
+        self.grid.led_level_col(x, y_offset, data)
+
+    def tilt_set(self, n, s):
+        self.grid.tilt_set(n, s)
+
 
 class GridBuffer:
     def __init__(self, width, height):
