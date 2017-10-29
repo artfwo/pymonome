@@ -3,59 +3,38 @@
 import asyncio
 import monome
 
-from faders import Faders
-class FadersPage(monome.Page, Faders):
-    def __init__(self, pages):
-        monome.Page.__init__(self, pages)
-        Faders.__init__(self)
-
-    def ready(self):
-        monome.Page.ready(self)
-        Faders.ready(self)
-
-from lights import Lights
-class LightsPage(monome.Page, Lights):
-    def __init__(self, manager):
-        monome.Page.__init__(self, manager)
-        Lights.__init__(self)
-
-    def ready(self):
-        monome.Page.ready(self)
-        Lights.ready(self)
-
 from life import Life
-class LifePage(monome.Page, Life):
-    def __init__(self, manager):
-        monome.Page.__init__(self, manager)
-        Life.__init__(self)
 
-    def ready(self):
-        monome.Page.ready(self)
-        Life.ready(self)
+class PagesSerialOsc(monome.SerialOsc):
+    def __init__(self, app1, app2, loop=None, autoconnect_app=None):
+        super().__init__(loop, autoconnect_app)
+        self.app1 = app1
+        self.app2 = app2
 
-from hello import Hello
-class HelloPage(monome.Page, Hello):
-    def __init__(self, manager):
-        monome.Page.__init__(self, manager)
-        Hello.__init__(self)
+    async def pages_connect(self, port):
+        transport, grid = await self.loop.create_datagram_endpoint(monome.Grid, local_addr=('127.0.0.1', 0), remote_addr=('127.0.0.1', port))
 
-    def ready(self):
-        monome.Page.ready(self)
-        Hello.ready(self)
+        page1 = monome.Page()
+        page2 = monome.Page()
+        page_manager = monome.SeqPageManager(grid=grid, pages=[page1, page2])
 
-class ExamplePages(monome.SumPageManager):
-    def __init__(self):
-        super().__init__([
-            FadersPage(self),
-            LightsPage(self),
-            LifePage(self),
-            HelloPage(self),
-        ])
+        self.app1.attach(page1)
+        self.app2.attach(page2)
 
-loop = asyncio.get_event_loop()
-asyncio.async(monome.create_serialosc_connection(ExamplePages, loop=loop))
+        page_manager.connect()
 
-try:
-    loop.run_forever()
-except KeyboardInterrupt:
-    print('kthxbye')
+    def on_device_added(self, id, type, port):
+        asyncio.async(self.pages_connect(port))
+
+if __name__ == "__main__":
+    life1 = Life()
+    life2 = Life()
+
+    loop = asyncio.get_event_loop()
+    asyncio.async(PagesSerialOsc.create(loop=loop, app1=life1, app2=life2))
+
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        life1.quit()
+        life2.quit()

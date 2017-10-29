@@ -227,21 +227,21 @@ class GridBuffer:
         self.height = height
 
     def __and__(self, other):
-        result = LedBuffer(self.width, self.height)
+        result = GridBuffer(self.width, self.height)
         for row in range(self.height):
             for col in range(self.width):
                 result.levels[row][col] = self.levels[row][col] & other.levels[row][col]
         return result
 
     def __xor__(self, other):
-        result = LedBuffer(self.width, self.height)
+        result = GridBuffer(self.width, self.height)
         for row in range(self.height):
             for col in range(self.width):
                 result.levels[row][col] = self.levels[row][col] ^ other.levels[row][col]
         return result
 
     def __or__(self, other):
-        result = LedBuffer(self.width, self.height)
+        result = GridBuffer(self.width, self.height)
         for row in range(self.height):
             for col in range(self.width):
                 result.levels[row][col] = self.levels[row][col] | other.levels[row][col]
@@ -309,28 +309,32 @@ class GridBuffer:
 
 
 class Page:
-    def __init__(self, manager):
-        self.manager = manager
+    def __init__(self):
+        self.manager = None
         self.__buffer = None
-        self.__intensity = 15
 
     @property
     def buffer(self):
         return self.__buffer
 
-    def ready(self):
-        self.__buffer = LedBuffer(self.width, self.height)
+    def on_grid_ready(self):
+        self.__buffer = GridBuffer(self.width, self.height)
+        self.event_handler.on_grid_ready()
+
+    def on_grid_key(self, x, y, s):
+        self.event_handler.on_grid_key(x, y, s)
+
+    def on_grid_disconnect(self):
+        self.event_handler.on_grid_disconnect()
 
     def is_active(self):
         return self is self.manager.current_page
 
-    # virtual pages shouldn't define stubs so they don't get
-    # in place of actual handlers with multiple inheritance
-    #def grid_key(self, x, y, s):
-    #    pass
+    def connect(self):
+        pass # TODO: not needed?
 
-    #def disconnect(self):
-    #    pass
+    def render(self):
+        self.__buffer.render(self.manager)
 
     def led_set(self, x, y, s):
         self.__buffer.led_set(x, y, s)
@@ -358,9 +362,7 @@ class Page:
             self.manager.led_col(x, y_offset, data)
 
     def led_intensity(self, i):
-        self.__intensity = i
-        if self.is_active():
-            self.manager.led_intensity(i)
+        self.manager.led_intensity(i)
 
     def led_level_set(self, x, y, l):
         self.__buffer.led_level_set(x, y, l)
@@ -387,51 +389,34 @@ class Page:
         if self.is_active():
             self.manager.led_level_col(x, y_offset, data)
 
-    def render(self):
-        self.__buffer.render(self.manager)
-        self.manager.led_intensity(self.__intensity)
 
-class BasePageManager(Grid):
-    def __init__(self, pages, **kwargs):
-        super().__init__(**kwargs)
+class BasePageManager(GridWrapper):
+    def __init__(self, grid, pages):
+        super().__init__(grid)
         self.pages = pages
-        self._presses = set()
-        self.current_page = self.pages[0]
-
-    def ready(self):
-        super().ready()
         for page in self.pages:
-            page.width = self.width
-            page.height = self.height
-            page.ready()
+            page.manager = self
+        self.set_page(0)
+
+    def on_grid_ready(self):
+        for page in self.pages:
+            page.width = self.grid.width
+            page.height = self.grid.height
+            page.on_grid_ready()
 
     def disconnect(self):
         super().disconnect()
         for page in self.pages:
             page.disconnect()
 
-    def grid_key(self, x, y, s):
-        if s == 1:
-            self._presses.add((x, y))
-        else:
-            self._presses.discard((x, y))
+    def on_grid_key(self, x, y, s):
+        self.current_page.on_grid_key(x, y, s)
 
-        self.current_page.grid_key(x, y, s)
-
-    def switch_page(self, page_num):
-        # send key-ups to previously active page
-        if page_num == -1 or self.pages[page_num] is not self.current_page:
-            for x, y in self._presses:
-                self.current_page.grid_key(x, y, 0)
-            self._presses.clear()
-
-        if page_num == -1:
-            self.current_page = None
-            self.led_all(0)
-        else:
-            # render current page
-            self.current_page = self.pages[page_num]
+    def set_page(self, index):
+        self.current_page = self.pages[index]
+        if (self.current_page.buffer):
             self.current_page.render()
+
 
 class SumPageManager(BasePageManager):
     def __init__(self, pages, switch_button=(-1, -1), **kwargs):
@@ -470,27 +455,25 @@ class SumPageManager(BasePageManager):
         self.led_row(0, self.height - 1, page_row)
         self.led_col(self.selected_page, 0, [1] * self.height)
 
+
 class SeqPageManager(BasePageManager):
-    def __init__(self, pages, switch_button=(-1, -1), **kwargs):
-        super().__init__(pages, **kwargs)
+    def __init__(self, grid, pages, switch_button=(-1, -1)):
+        super().__init__(grid, pages)
         self.switch_button = switch_button
 
-    def ready(self):
-        super().ready()
+    def on_grid_ready(self):
+        super().on_grid_ready()
         switch_x, switch_y = self.switch_button
 
-        self.switch_x = self.width + switch_x if switch_x < 0 else switch_x
-        self.switch_y = self.height + switch_y if switch_y < 0 else switch_y
+        self.switch_x = self.grid.width + switch_x if switch_x < 0 else switch_x
+        self.switch_y = self.grid.height + switch_y if switch_y < 0 else switch_y
 
-    def grid_key(self, x, y, s):
-        if not self._presses and \
-           x == self.switch_x and \
-           y == self.switch_y and \
-           s == 1:
-            self.switch_page((self.pages.index(self.current_page) + 1) % len(self.pages))
+    def on_grid_key(self, x, y, s):
+        # TODO: bring back presses from pymonome 0.8
+        if x == self.switch_x and y == self.switch_y and s == 1:
+            self.set_page((self.pages.index(self.current_page) + 1) % len(self.pages))
         else:
-            super().grid_key(x, y, s)
-
+            super().on_grid_key(x, y, s)
 
 class GridSection:
     def __init__(self, size, offset):
