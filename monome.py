@@ -607,7 +607,7 @@ class SerialOsc(aiosc.OSCProtocol):
 
     def on_device_added(self, id, type, port):
         if self.autoconnect_app is not None:
-            asyncio.async(self.autoconnect(self.autoconnect_app, port))
+            asyncio.ensure_future(self.autoconnect(self.autoconnect_app, port))
 
     def on_device_removed(self, id, type, port):
         pass
