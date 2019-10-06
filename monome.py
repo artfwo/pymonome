@@ -1,6 +1,6 @@
 # pymonome - library for interfacing with monome devices
 #
-# Copyright (c) 2011-2014 Artem Popov <artfwo@gmail.com>
+# Copyright (c) 2011-2019 Artem Popov <artfwo@gmail.com>
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -22,61 +22,53 @@
 
 import asyncio
 import aiosc
-import itertools
 import re
-
-
-DISCONNECTED, CONNECTING, READY = range(3)
 
 def pack_row(row):
     return row[7] << 7 | row[6] << 6 | row[5] << 5 | row[4] << 4 | row[3] << 3 | row[2] << 2 | row[1] << 1 | row[0]
 
 
-class Grid(aiosc.OSCProtocol):
+class Event:
     def __init__(self):
-        self.prefix = 'monome'
+        self.handlers = set()
+
+    def add_handler(self, handler):
+        self.handlers.add(handler)
+
+    def remove_handler(self, handler):
+        self.handlers.discard(handler)
+
+    def dispatch(self, *args, **kwargs):
+        for handler in self.handlers:
+            handler(*args, **kwargs)
+
+
+class Device(aiosc.OSCProtocol):
+    def __init__(self, prefix='monome'):
+        super().__init__()
+
+        self.add_handler('/sys/disconnect', self._on_sys_disconnect)
+        self.add_handler('/sys/{id,size,host,port,prefix,rotation}', self._on_sys_info)
+
+        self.transport = None
+        self.prefix = prefix
+        self.ready_event = Event()
+        self.disconnect_event = Event()
+        self._unset_info_properties()
+
+    def _unset_info_properties(self):
         self.id = None
         self.width = None
         self.height = None
-        self.varibright = True
-        self.state = DISCONNECTED
+        self.rotation = None
 
-        super().__init__(handlers={
-            '/sys/connect': lambda *args: self.__sys_connect(),
-            '/sys/disconnect': lambda *args: self.__sys_disconnect(),
-            '/sys/{id,size,host,port,prefix,rotation}': self.__sys_info,
-            '/*/grid/key'.format(self.prefix): self.__grid_key,
-            '/*/tilt'.format(self.prefix): self.__tilt,
-        })
+    def _info_properties_set(self):
+        return all(x is not None for x in [self.id, self.width, self.height, self.rotation])
 
-        self.event_handler = None
+    def _on_sys_disconnect(self, addr, path, *args):
+        self.disconnect()
 
-    def connection_made(self, transport):
-        super().connection_made(transport)
-        self.host, self.port = transport.get_extra_info('sockname')
-
-    def connect(self):
-        if self.state == DISCONNECTED:
-            self.state = CONNECTING
-            self.send('/sys/host', self.host)
-            self.send('/sys/port', self.port)
-            self.send('/sys/prefix', self.prefix)
-            #self.send('/sys/info', self.host, self.port)
-            self.send('/sys/info/id', self.host, self.port)
-            self.send('/sys/info/size', self.host, self.port)
-
-    def __sys_connect(self):
-        # TODO: shouldn't normally happen, because we close the socket on disconnect
-        pass
-
-    def __sys_disconnect(self):
-        self.state = DISCONNECTED
-        self.transport.close()
-
-        if self.event_handler is not None:
-            self.event_handler.on_grid_disconnect()
-
-    def __sys_info(self, addr, path, *args):
+    def _on_sys_info(self, addr, path, *args):
         if path == '/sys/id':
             self.id = args[0]
         elif path == '/sys/size':
@@ -84,25 +76,57 @@ class Grid(aiosc.OSCProtocol):
         elif path == '/sys/rotation':
             self.rotation = args[0]
 
-        if all(x is not None for x in [self.id, self.width, self.height]):
-            self.state = READY
+        if self._info_properties_set():
+            self.ready_event.dispatch()
 
-            if not re.match('^m\d+$', self.id):
-                self.varibright = False
+    def connection_made(self, transport):
+        super().connection_made(transport)
+        self.host, self.port = transport.get_extra_info('sockname')
 
-            self.__ready()
+        self.send('/sys/host', self.host)
+        self.send('/sys/port', self.port)
+        self.send('/sys/prefix', self.prefix)
+        self.send('/sys/info/id', self.host, self.port)
+        self.send('/sys/info/size', self.host, self.port)
+        self.send('/sys/info/rotation', self.host, self.port)
 
-    def __ready(self):
-        if self.event_handler is not None:
-            self.event_handler.on_grid_ready()
+    async def connect(self, host, port):
+        if self.transport and not self.transport.is_closing():
+            self.disconnect()
 
-    def __grid_key(self, addr, path, x, y, s):
-        if self.event_handler is not None and path.startswith("/" + self.prefix):
-            self.event_handler.on_grid_key(x, y, s)
+        loop = asyncio.get_running_loop()
+        transport, protocol = await loop.create_datagram_endpoint(lambda: self,
+            local_addr=('127.0.0.1', 0),
+            remote_addr=(host, port))
 
-    def __tilt(self, addr, path, n, x, y, z):
-        if self.event_handler is not None and path.startswith("/" + self.prefix):
-            self.event_handler_on_tilt(n, x, y, z)
+    def disconnect(self):
+        self.disconnect_event.dispatch()
+        self.reset_info_properties()
+        self.transport.close()
+
+
+class Grid(Device):
+    def __init__(self, prefix='monome'):
+        super().__init__(prefix)
+
+        self.add_handler('/*/grid/key', self._on_grid_key)
+        self.add_handler('/*/tilt', self._on_tilt)
+
+        self.key_event = Event()
+        self.tilt_event = Event()
+        self.varibright = True
+
+        self.ready_event.add_handler(self._set_varibright)
+
+    def _set_varibright(self):
+        if not re.match('^m\d+$', self.id):
+            self.varibright = False
+
+    def _on_grid_key(self, addr, path, x, y, s):
+        self.key_event.dispatch(x, y, s)
+
+    def _on_tilt(self, addr, path, n, x, y, z):
+        self.tilt_event.dispatch(n, x, y, z)
 
     def led_set(self, x, y, s):
         self.send('/{}/grid/led/set'.format(self.prefix), x, y, s)
@@ -160,64 +184,126 @@ class Grid(aiosc.OSCProtocol):
         self.send('/{}/tilt/set'.format(self.prefix), n, s)
 
 
-class GridWrapper:
-    def __init__(self, grid):
-        self.grid = grid
-        self.grid.event_handler = self
-        self.event_handler = None
+class Arc(Device):
+    def __init__(self, prefix='monome'):
+        super().__init__(prefix)
 
-    def connect(self):
-        if self.grid.state == DISCONNECTED:
-            self.grid.connect()
-        elif self.grid.state == CONNECTED:
-            self.on_grid_ready()
+        self.add_handler('/*/enc/delta', self._on_enc_delta)
+        self.add_handler('/*/enc/key', self._on_enc_key)
+
+        self.delta_event = Event()
+        self.key_event = Event()
+
+    def _on_enc_delta(self, addr, path, ring, delta):
+        self.delta_event.dispatch(ring, delta)
+
+    def _on_enc_key(self, addr, n, s):
+        self.key_event.dispatch(n, s)
+
+    def ring_set(self, n, x, l):
+        self.send('/{}/ring/set'.format(self.prefix), n, x, l)
+
+    def ring_all(self, n, l):
+        self.send('/{}/ring/all'.format(self.prefix), n, l)
+
+    def ring_map(self, n, data):
+        self.send('/{}/ring/map'.format(self.prefix), n, *data)
+
+    def ring_range(self, n, x1, x2, l):
+        self.send('/{}/ring/range'.format(self.prefix), n, x1, x2, l)
+
+
+class SerialOsc(aiosc.OSCProtocol):
+    def __init__(self, loop=None, autoconnect_app=None):
+        super().__init__(handlers={
+            '/serialosc/device': self._on_serialosc_device,
+            '/serialosc/add': self._on_serialosc_add,
+            '/serialosc/remove': self._on_serialosc_remove,
+        })
+
+        self.device_added_event = Event()
+        self.device_removed_event = Event()
+
+    def connection_made(self, transport):
+        super().connection_made(transport)
+        self.host, self.port = transport.get_extra_info('sockname')
+
+        self.send('/serialosc/list', self.host, self.port)
+        self.send('/serialosc/notify', self.host, self.port)
+
+    async def connect(self):
+        loop = asyncio.get_running_loop()
+        transport, protocol = await loop.create_datagram_endpoint(lambda: self,
+            local_addr=('127.0.0.1', 0),
+            remote_addr=('127.0.0.1', 12002))
+
+    def _on_serialosc_device(self, addr, path, id, type, port):
+        type = type.strip() # remove trailing spaces for arcs
+        self.device_added_event.dispatch(id, type, port)
+
+    def _on_serialosc_add(self, addr, path, id, type, port):
+        type = type.strip() # remove trailing spaces for arcs
+        self.device_added_event.dispatch(id, type, port)
+        self.send('/serialosc/notify', self.host, self.port)
+
+    def _on_serialosc_remove(self, addr, path, id, type, port):
+        type = type.strip() # remove trailing spaces for arcs
+        self.device_removed_event.dispatch(id, type, port)
+        self.send('/serialosc/notify', self.host, self.port)
+
+
+class GridApp:
+    def __init__(self, grid=None):
+        if grid is None:
+            grid = Grid()
+
+        self.set_grid(grid)
+
+    def set_grid(self, grid):
+        self.grid = grid
+        self.grid.ready_event.add_handler(self.on_grid_ready)
+        self.grid.disconnect_event.add_handler(self.on_grid_disconnect)
+        self.grid.key_event.add_handler(self.on_grid_key)
+        self.grid.tilt_event.add_handler(self.on_tilt)
 
     def on_grid_ready(self):
-        self.width = self.grid.width
-        self.height = self.grid.height
-        self.event_handler.on_grid_ready()
-
-    def on_grid_key(self, x, y, s):
-        self.event_handler.on_grid_key(x, y, s)
+        pass
 
     def on_grid_disconnect(self):
-        self.event_handler.on_grid_disconnect()
+        pass
 
-    def led_set(self, x, y, s):
-        self.grid.led_set(x, y, s)
+    def on_grid_key(self, x, y, s):
+        pass
 
-    def led_all(self, s):
-        self.grid.led_all(s)
+    def on_tilt(self, n, x, y, z):
+        pass
 
-    def led_map(self, x_offset, y_offset, data):
-        self.grid.led_map(x_offset, y_offset, data)
 
-    def led_row(self, x_offset, y, data):
-        self.grid.led_row(x_offset, y, data)
+class ArcApp:
+    def __init__(self, arc=None):
+        if arc is None:
+            arc = Arc()
 
-    def led_col(self, x, y_offset, data):
-        self.grid.led_col(x, y_offset, data)
+        self.set_arc(arc)
 
-    def led_intensity(self, i):
-        self.grid.led_intensity(i)
+    def set_arc(self, arc):
+        self.arc = arc
+        self.arc.ready_event.add_handler(self.on_arc_ready)
+        self.arc.disconnect_event.add_handler(self.on_arc_disconnect)
+        self.arc.delta_event.add_handler(self.on_arc_delta)
+        self.arc.key_event.add_handler(self.on_arc_key)
 
-    def led_level_set(self, x, y, l):
-        self.grid.led_level_set(x, y, l)
+    def on_arc_ready(self):
+        pass
 
-    def led_level_all(self, l):
-        self.grid.led_level_all(l)
+    def on_arc_disconnect(self):
+        pass
 
-    def led_level_map(self, x_offset, y_offset, data):
-        self.grid.led_level_map(x_offset, y_offset, data)
+    def on_arc_delta(self, ring, delta):
+        pass
 
-    def led_level_row(self, x_offset, y, data):
-        self.grid.led_level_row(x_offset, y, data)
-
-    def led_level_col(self, x, y_offset, data):
-        self.grid.led_level_col(x, y_offset, data)
-
-    def tilt_set(self, n, s):
-        self.grid.tilt_set(n, s)
+    def on_arc_key(self, ring, s):
+        pass
 
 
 class GridBuffer:
@@ -295,350 +381,47 @@ class GridBuffer:
             map.append(row)
         return map
 
-    def get_binary_map(self, x_offset, y_offset):
-        map = []
-        for y in range(y_offset, y_offset + 8):
-            row = [1 if self.levels[y][col] > 7 else 0 for col in range(x_offset, x_offset + 8)]
-            map.append(row)
-        return map
-
     def render(self, grid):
         for x_offset in [i * 8 for i in range(self.width // 8)]:
             for y_offset in [i * 8 for i in range(self.height // 8)]:
                 grid.led_level_map(x_offset, y_offset, self.get_level_map(x_offset, y_offset))
 
 
-class Page:
-    def __init__(self):
-        self.manager = None
-        self.__buffer = None
-
-    @property
-    def buffer(self):
-        return self.__buffer
-
-    def on_grid_ready(self):
-        self.__buffer = GridBuffer(self.width, self.height)
-        self.event_handler.on_grid_ready()
-
-    def on_grid_key(self, x, y, s):
-        self.event_handler.on_grid_key(x, y, s)
-
-    def on_grid_disconnect(self):
-        self.event_handler.on_grid_disconnect()
-
-    def is_active(self):
-        return self is self.manager.current_page
-
-    def connect(self):
-        pass # TODO: not needed?
-
-    def render(self):
-        self.__buffer.render(self.manager)
-
-    def led_set(self, x, y, s):
-        self.__buffer.led_set(x, y, s)
-        if self.is_active():
-            self.manager.led_set(x, y, s)
-
-    def led_all(self, s):
-        self.__buffer.led_all(s)
-        if self.is_active():
-            self.manager.led_all(s)
-
-    def led_map(self, x_offset, y_offset, data):
-        self.__buffer.led_map(x_offset, y_offset, data)
-        if self.is_active():
-            self.manager.led_map(x_offset, y_offset, data)
-
-    def led_row(self, x_offset, y, data):
-        self.__buffer.led_row(x_offset, y, data)
-        if self.is_active():
-            self.manager.led_row(x_offset, y, data)
-
-    def led_col(self, x, y_offset, data):
-        self.__buffer.led_col(x, y_offset, data)
-        if self.is_active():
-            self.manager.led_col(x, y_offset, data)
-
-    def led_intensity(self, i):
-        self.manager.led_intensity(i)
-
-    def led_level_set(self, x, y, l):
-        self.__buffer.led_level_set(x, y, l)
-        if self.is_active():
-            self.manager.led_level_set(x, y, l)
-
-    def led_level_all(self, l):
-        self.__buffer.led_level_all(l)
-        if self.is_active():
-            self.manager.led_level_all(l)
-
-    def led_level_map(self, x_offset, y_offset, data):
-        self.__buffer.led_level_map(x_offset, y_offset, data)
-        if self.is_active():
-            self.manager.led_level_map(x_offset, y_offset, data)
-
-    def led_level_row(self, x_offset, y, data):
-        self.__buffer.led_level_row(x_offset, y, data)
-        if self.is_active():
-            self.manager.led_level_row(x_offset, y, data)
-
-    def led_level_col(self, x, y_offset, data):
-        self.__buffer.led_level_col(x, y_offset, data)
-        if self.is_active():
-            self.manager.led_level_col(x, y_offset, data)
-
-
-class BasePageManager(GridWrapper):
-    def __init__(self, grid, pages):
-        super().__init__(grid)
-        self.pages = pages
-        for page in self.pages:
-            page.manager = self
-        self.set_page(0)
-
-    def on_grid_ready(self):
-        for page in self.pages:
-            page.width = self.grid.width
-            page.height = self.grid.height
-            page.on_grid_ready()
-
-    def disconnect(self):
-        super().disconnect()
-        for page in self.pages:
-            page.disconnect()
-
-    def on_grid_key(self, x, y, s):
-        self.current_page.on_grid_key(x, y, s)
-
-    def set_page(self, index):
-        self.current_page = self.pages[index]
-        if (self.current_page.buffer):
-            self.current_page.render()
-
-
-class SumPageManager(BasePageManager):
-    def __init__(self, pages, switch_button=(-1, -1), **kwargs):
-        super().__init__(pages, **kwargs)
-        self.switch_button = switch_button
-
-    def ready(self):
-        super().ready()
-        switch_x, switch_y = self.switch_button
-
-        self.switch_x = self.width + switch_x if switch_x < 0 else switch_x
-        self.switch_y = self.height + switch_y if switch_y < 0 else switch_y
-
-    def grid_key(self, x, y, s):
-        if not self._presses and \
-           x == self.switch_x and \
-           y == self.switch_y:
-            if s == 1:
-                self.selected_page = self.pages.index(self.current_page)
-                self.switch_page(-1)
-                self.display_chooser()
-            else:
-                self.switch_page(self.selected_page)
-            return
-        # handle regular buttons
-        if self.current_page is None:
-            if x < len(self.pages):
-                self.selected_page = x
-                self.display_chooser()
-            return
-        super().grid_key(x, y, s)
-
-    def display_chooser(self):
-        self.led_all(0)
-        page_row = [1 if i < len(self.pages) else 0 for i in range(self.width)]
-        self.led_row(0, self.height - 1, page_row)
-        self.led_col(self.selected_page, 0, [1] * self.height)
-
-
-class SeqPageManager(BasePageManager):
-    def __init__(self, grid, pages, switch_button=(-1, -1)):
-        super().__init__(grid, pages)
-        self.switch_button = switch_button
-
-    def on_grid_ready(self):
-        super().on_grid_ready()
-        switch_x, switch_y = self.switch_button
-
-        self.switch_x = self.grid.width + switch_x if switch_x < 0 else switch_x
-        self.switch_y = self.grid.height + switch_y if switch_y < 0 else switch_y
-
-    def on_grid_key(self, x, y, s):
-        # TODO: bring back presses from pymonome 0.8
-        if x == self.switch_x and y == self.switch_y and s == 1:
-            self.set_page((self.pages.index(self.current_page) + 1) % len(self.pages))
-        else:
-            super().on_grid_key(x, y, s)
-
-class GridSection:
-    def __init__(self, size, offset):
-        self.splitter = None
-        self.event_handler = None
-
-        self.section_width = size[0]
-        self.section_height = size[1]
-        self.x_offset = offset[0]
-        self.y_offset = offset[1]
-
-    def connect(self):
-        pass
-
-    def on_grid_ready(self):
-        self.width = self.section_width
-        self.height = self.section_height
-        self.event_handler.on_grid_ready()
-
-    def on_grid_key(self, x, y, s):
-        self.event_handler.on_grid_key(x, y, s)
-
-    def on_grid_disconnect(self):
-        self.event_handler.on_grid_disconnect()
-
-    def led_set(self, x, y, s):
-        if x < self.section_width and y < self.section_height:
-            self.splitter.led_set(x + self.x_offset, y + self.y_offset, s)
-
-    def led_all(self, s):
-        # TODO: fix map
-        data = [[s for col in range(8)] for row in range(8)]
-        self.splitter.led_map(self.x_offset, self.y_offset, data)
-
-    def led_map(self, x_offset, y_offset, data):
-        self.splitter.led_map(self.x_offset + x_offset, self.y_offset + y_offset, data)
-
-    def led_row(self, x_offset, y, data):
-        data = data[:self.section_width]
-        self.splitter.led_row(self.x_offset + x_offset, self.y_offset + y, data)
-
-    def led_col(self, x, y_offset, data):
-        data = data[:self.section_height]
-        self.splitter.led_col(self.x_offset + x, self.y_offset + y_offset, data)
-
-    def led_intensity(self, i):
-        self.splitter.led_intensity(i)
-
-    def led_level_set(self, x, y, l):
-        if x < self.section_width and y < self.section_height:
-            self.splitter.led_level_set(self.x_offset + x, self.y_offset + y, l)
-
-    def led_level_all(self, l):
-        data = [[l for col in range(8)] for row in range(8)]
-        self.splitter.led_map(self.x_offset, self.y_offset, data)
-
-    def led_level_map(self, x_offset, y_offset, data):
-        self.splitter.led_level_map(self.x_offset + x_offset, self.y_offset + y_offset, data)
-
-    def led_level_row(self, x_offset, y, data):
-        data = data[:self.section_width]
-        self.splitter.led_level_row(self.x_offset + x_offset, self.y_offset + y, data)
-
-    def led_level_col(self, x, y_offset, data):
-        data = data[:self.section_height]
-        self.splitter.led_level_col(self.x_offset + x, self.y_offset + y_offset, data)
-
-
-class Splitter(GridWrapper):
-    def __init__(self, grid, sections):
-        super().__init__(grid)
-        self.sections = sections
-        for section in self.sections:
-            section.splitter = self
-
-    def on_grid_ready(self):
-        for section in self.sections:
-            section.on_grid_ready()
-
-    def on_grid_disconnect(self):
-        for section in self.sections:
-            section.on_grid_disconnect()
-
-    def on_grid_key(self, x, y, s):
-        for section in self.sections:
-            if section.x_offset <= x < section.x_offset + section.section_width and \
-               section.y_offset <= y < section.y_offset + section.section_height:
-                section.on_grid_key(x - section.x_offset, y - section.y_offset, s)
-
-
-class SerialOsc(aiosc.OSCProtocol):
-    def __init__(self, loop=None, autoconnect_app=None):
-        super().__init__(handlers={
-            '/serialosc/device': self.__on_serialosc_device,
-            '/serialosc/add': self.__on_serialosc_add,
-            '/serialosc/remove': self.__on_serialosc_remove,
-        })
-
-        if loop is None:
-            loop = asyncio.get_event_loop()
-        self.loop = loop
-
-        self.autoconnect_app = autoconnect_app
-
-    @classmethod
-    async def create(cls, loop=None, autoconnect_app=None, **kwargs):
-        if loop is None:
-            loop = asyncio.get_event_loop()
-
-        transport, protocol = await loop.create_datagram_endpoint(lambda: cls(loop=loop, autoconnect_app=autoconnect_app, **kwargs),
-            local_addr=('127.0.0.1', 0), remote_addr=('127.0.0.1', 12002))
-        return protocol
-
-    def connection_made(self, transport):
-        super().connection_made(transport)
-        self.host, self.port = transport.get_extra_info('sockname')
-
-        self.send('/serialosc/list', self.host, self.port)
-        self.send('/serialosc/notify', self.host, self.port)
-
-    def __on_serialosc_device(self, addr, path, id, type, port):
-        self.on_device_added(id, type, port)
-
-    def __on_serialosc_add(self, addr, path, id, type, port):
-        self.on_device_added(id, type, port)
-        self.send('/serialosc/notify', self.host, self.port)
-
-    def __on_serialosc_remove(self, addr, path, id, type, port):
-        self.on_device_removed(id, type, port)
-        self.send('/serialosc/notify', self.host, self.port)
-
-    def on_device_added(self, id, type, port):
-        if self.autoconnect_app is not None:
-            asyncio.ensure_future(self.autoconnect(self.autoconnect_app, port))
-
-    def on_device_removed(self, id, type, port):
-        pass
-
-    async def autoconnect(self, app, grid_port):
-        transport, grid = await self.loop.create_datagram_endpoint(Grid,
-            local_addr=('127.0.0.1', 0), remote_addr=('127.0.0.1', grid_port))
-
-        app.attach(grid)
-
-class App:
-    def __init__(self, prefix='/monome'):
-        self.prefix = prefix.strip('/')
-        self.grid = None
-
-    def attach(self, grid):
-        # TODO: should this happen before or after we connect?
-        self.grid = grid
-        self.grid.event_handler = self
-        self.grid.prefix = self.prefix
-        self.grid.connect()
-
-    def detach(self):
-        self.grid.event_handler = None
-        self.grid = None
-
-    def on_grid_ready(self):
-        pass
-
-    def on_grid_disconnect(self):
-        self.detach()
-
-    def on_grid_key(self, x, y, s):
-        pass
+class ArcBuffer:
+    def __init__(self, rings):
+        self.levels = [[0 for i in range(64)] for ring in range(rings)]
+
+    def __and__(self, other):
+        rings = len(self.levels)
+        result = ArcBuffer(rings)
+        for ring in range(rings):
+            for x in range(64):
+                result.levels[ring][x] = self.levels[ring][x] & other.levels[ring][x]
+        return result
+
+    def __xor__(self, other):
+        result = GridBuffer(self.width, self.height)
+        for row in range(self.height):
+            for col in range(self.width):
+                result.levels[row][col] = self.levels[row][col] ^ other.levels[row][col]
+        return result
+
+    def __or__(self, other):
+        result = GridBuffer(self.width, self.height)
+        for row in range(self.height):
+            for col in range(self.width):
+                result.levels[row][col] = self.levels[row][col] | other.levels[row][col]
+        return result
+
+    def ring_set(self, n, x, l):
+        self.levels[n][x] = l
+
+    def ring_all(self, n, l):
+        self.levels[n] = [l] * 64
+
+    def ring_map(self, n, data):
+        self.levels[n] = data
+
+    def ring_range(self, n, x1, x2, l):
+        for i in range(x1, x2 + 1):
+            self.levels[n][i] = l
