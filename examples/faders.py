@@ -6,7 +6,7 @@ import monome
 
 FADERS_MAX_VALUE = 100
 
-class Faders(monome.App):
+class Faders(monome.GridApp):
     def __init__(self):
         super().__init__() # TODO: prefix
 
@@ -47,5 +47,14 @@ class Faders(monome.App):
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     faders_app = Faders()
-    asyncio.async(monome.SerialOsc.create(loop=loop, autoconnect_app=faders_app))
+
+    def serialosc_device_added(id, type, port):
+        print('connecting to {} ({})'.format(id, type))
+        asyncio.ensure_future(faders_app.grid.connect('127.0.0.1', port))
+
+    serialosc = monome.SerialOsc()
+    serialosc.device_added_event.add_handler(serialosc_device_added)
+
+    loop.run_until_complete(serialosc.connect())
+
     loop.run_forever()
