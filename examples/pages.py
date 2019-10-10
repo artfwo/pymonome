@@ -26,15 +26,24 @@ class PagesSerialOsc(monome.SerialOsc):
     def on_device_added(self, id, type, port):
         asyncio.async(self.pages_connect(port))
 
-if __name__ == "__main__":
-    life1 = Life()
-    life2 = Life()
-
+if __name__ == '__main__':
     loop = asyncio.get_event_loop()
-    asyncio.async(PagesSerialOsc.create(loop=loop, app1=life1, app2=life2))
 
-    try:
-        loop.run_forever()
-    except KeyboardInterrupt:
-        life1.quit()
-        life2.quit()
+    pages = monome.SumGridPageManager(2)
+
+    life1 = Life()
+    life1.set_grid(pages.pages[0])
+
+    life2 = Life()
+    life2.set_grid(pages.pages[1])
+
+    def serialosc_device_added(id, type, port):
+        print('connecting to {} ({})'.format(id, type))
+        asyncio.ensure_future(pages.grid.connect('127.0.0.1', port))
+
+    serialosc = monome.SerialOsc()
+    serialosc.device_added_event.add_handler(serialosc_device_added)
+
+    loop.run_until_complete(serialosc.connect())
+
+    loop.run_forever()
