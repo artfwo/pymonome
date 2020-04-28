@@ -7,20 +7,39 @@
 import asyncio
 import monome
 
-class Monobright(monome.Monome):
+
+class MonobrightGrid(monome.Grid):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.varibright = False
+
+
+class MonobrightApp(monome.GridApp):
     def __init__(self):
-        super().__init__('/hello', varibright=False)
+        grid = MonobrightGrid()
+        super().__init__(grid)
 
     async def light(self, x, y):
         for i in range(16):
-            self.led_level_set(x, y, i)
+            self.grid.led_level_set(x, y, i)
             await asyncio.sleep(0.1)
 
-    def grid_key(self, x, y, s):
+    def on_grid_key(self, x, y, s):
         if s == 1:
-            asyncio.async(self.light(x, y))
+            asyncio.ensure_future(self.light(x, y))
+
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
-    asyncio.async(monome.create_serialosc_connection(Monobright, loop=loop))
+    monobright_app = MonobrightApp()
+
+    def serialosc_device_added(id, type, port):
+        print('connecting to {} ({})'.format(id, type))
+        asyncio.ensure_future(monobright_app.grid.connect('127.0.0.1', port))
+
+    serialosc = monome.SerialOsc()
+    serialosc.device_added_event.add_handler(serialosc_device_added)
+
+    loop.run_until_complete(serialosc.connect())
+
     loop.run_forever()
