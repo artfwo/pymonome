@@ -400,6 +400,7 @@ class GridBuffer:
 
 class ArcBuffer:
     def __init__(self, rings):
+        self.rings = rings
         self.levels = [[0 for i in range(64)] for ring in range(rings)]
 
     def __and__(self, other):
@@ -436,6 +437,10 @@ class ArcBuffer:
     def ring_range(self, n, x1, x2, l):
         for i in range(x1, x2 + 1):
             self.levels[n][i] = l
+
+    def render(self, arc):
+        for i in range (self.rings):
+            arc.ring_map(i, self.levels[i])
 
 
 class GridPage:
