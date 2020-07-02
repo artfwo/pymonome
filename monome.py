@@ -203,7 +203,7 @@ class Arc(Device):
     def _on_enc_delta(self, addr, path, ring, delta):
         self.delta_event.dispatch(ring, delta)
 
-    def _on_enc_key(self, addr, n, s):
+    def _on_enc_key(self, addr, path, n, s):
         self.key_event.dispatch(n, s)
 
     def ring_set(self, n, x, l):
