@@ -34,7 +34,7 @@ class ExampleArcApp(monome.ArcApp):
         self.pos[ring] = new_pos
 
     def on_arc_key(self, ring, s):
-        print('Ring: {} Pressed:{}'.format(ring, s > 0))
+        print('Ring: {} Pressed: {}'.format(ring, s > 0))
         self.arc.ring_all(ring, 15 if s > 0 else 0)
 
 
