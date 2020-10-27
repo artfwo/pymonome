@@ -20,7 +20,7 @@ class ExampleArcApp(monome.ArcApp):
         print('Arc disconnected.')
 
     def on_arc_delta(self, ring, delta):
-        print('Ring: {} Delta: {}'.format(ring, delta))
+        print(f'Ring: {ring} Delta: {delta}')
 
         old_pos = self.pos[ring]
         new_pos = old_pos + delta
@@ -30,11 +30,12 @@ class ExampleArcApp(monome.ArcApp):
                 self.arc.ring_set(ring, p, 15)
         else:
             for p in range(new_pos, old_pos):
-                self.arc.ring_set(ring, p, 0)
+                self.arc.ring_set(ring, p, 5)
+
         self.pos[ring] = new_pos
 
     def on_arc_key(self, ring, s):
-        print('Ring: {} Pressed: {}'.format(ring, s > 0))
+        print(f'Ring: {ring} Pressed: {s > 0}')
         self.arc.ring_all(ring, 15 if s > 0 else 0)
 
 
@@ -43,7 +44,11 @@ if __name__ == '__main__':
     app = ExampleArcApp()
 
     def serialosc_device_added(id, type, port):
-        print('connecting to {} ({})'.format(id, type))
+        if 'arc' not in type:
+            print(f'ignoring {id} ({type}) as device does not appear to be an arc')
+            return
+
+        print(f'connecting to {id} ({type})')
         asyncio.ensure_future(app.arc.connect('127.0.0.1', port))
 
     serialosc = monome.SerialOsc()
