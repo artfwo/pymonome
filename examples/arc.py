@@ -5,21 +5,16 @@
 import asyncio
 import monome
 
-class ExampleArc(monome.Arc):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
 
 class ExampleArcApp(monome.ArcApp):   
     def __init__(self):
-        arc = ExampleArc()
-        self.pos = [0, 0, 0, 0];
-        super().__init__(arc)
+        super().__init__()
+        self.pos = [0, 0, 0, 0]
         
     def on_arc_ready(self):
         print('Ready, clearing all rings...')
-        for n in range(0,4):
-            self.arc.ring_all(n,0)
+        for n in range(0, 4):
+            self.arc.ring_all(n, 0)
             
     def on_arc_disconnect(self):
         print('Arc disconnected.')
@@ -27,16 +22,16 @@ class ExampleArcApp(monome.ArcApp):
     def on_arc_delta(self, ring, delta):
         print('Ring: {} Delta: {}'.format(ring, delta))
         
-        oldPos = self.pos[ring]
-        newPos = oldPos + delta
+        old_pos = self.pos[ring]
+        new_pos = old_pos + delta
         
-        if newPos > oldPos:
-            for p in range(oldPos, newPos):
+        if new_pos > old_pos:
+            for p in range(old_pos, new_pos):
                 self.arc.ring_set(ring, p, 15)
         else:
-            for p in range(newPos, oldPos):
+            for p in range(new_pos, old_pos):
                 self.arc.ring_set(ring, p, 0)
-        self.pos[ring] = newPos
+        self.pos[ring] = new_pos
 
     def on_arc_key(self, ring, s):
         print('Ring: {} Pressed:{}'.format(ring, s > 0))
