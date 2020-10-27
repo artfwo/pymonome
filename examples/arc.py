@@ -13,7 +13,7 @@ class ExampleArcApp(monome.ArcApp):
         
     def on_arc_ready(self):
         print('Ready, clearing all rings...')
-        for n in range(0, 4):
+        for n in range(0,4):
             self.arc.ring_all(n, 0)
             
     def on_arc_disconnect(self):
