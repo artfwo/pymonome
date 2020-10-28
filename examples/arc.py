@@ -26,11 +26,9 @@ class ExampleArcApp(monome.ArcApp):
         new_pos = old_pos + delta
 
         if new_pos > old_pos:
-            for p in range(old_pos, new_pos):
-                self.arc.ring_set(ring, p, 15)
+            self.arc.ring_range(ring, old_pos, new_pos, 15)
         else:
-            for p in range(new_pos, old_pos):
-                self.arc.ring_set(ring, p, 5)
+            self.arc.ring_range(ring, new_pos, old_pos, 5)
 
         self.pos[ring] = new_pos
 
