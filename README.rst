@@ -7,6 +7,18 @@ pymonome is a pure Python library for easy interaction with the
 controllers (via serialosc) and provides additional classes for developing
 grid- and arc-based applications.
 
+Installation
+============
+
+pymonome requires at least Python 3.6. It can be installed using pip::
+
+    pip3 install pymonome
+
+Or use the ``--user`` option to install pymonome to the current user
+library directory::
+
+    pip3 install --user pymonome
+
 Usage
 =====
 
