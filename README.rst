@@ -4,7 +4,7 @@ pymonome
 
 pymonome is a pure Python library for easy interaction with the
 `monome family <https://monome.org>` of devices. It supports grid and arc
-controllers (via serialosc) and provides additional classes for developing
+controllers (via serialosc) and provides additional facilities for developing
 grid- and arc-based applications.
 
 Installation
@@ -23,12 +23,14 @@ Usage
 =====
 
 pymonome does not communicate with any of the devices directly. Like many
-monome applications, it uses serialosc for device detection and hardware
+monome applications, it relies on serialosc for device detection and hardware
 input and output. As serialosc provides OSC (UDP) ports for all the devices
 connected to the host system, it is possible to connect to a grid via a known
 UDP port as follows:
 
 .. code-block:: python
+
+    import monome
 
     GRID_HOST = '127.0.0.1'
     GRID_PORT = 16816
