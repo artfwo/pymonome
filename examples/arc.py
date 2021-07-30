@@ -37,8 +37,8 @@ class ExampleArcApp(monome.ArcApp):
         self.arc.ring_all(ring, 15 if s > 0 else 0)
 
 
-if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
+async def main():
+    loop = asyncio.get_running_loop()
     app = ExampleArcApp()
 
     def serialosc_device_added(id, type, port):
@@ -52,6 +52,8 @@ if __name__ == '__main__':
     serialosc = monome.SerialOsc()
     serialosc.device_added_event.add_handler(serialosc_device_added)
 
-    loop.run_until_complete(serialosc.connect())
+    await serialosc.connect()
+    await loop.create_future()
 
-    loop.run_forever()
+if __name__ == '__main__':
+    asyncio.run(main())

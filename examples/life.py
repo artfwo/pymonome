@@ -70,8 +70,8 @@ class Life(monome.GridApp):
             for col in range(self.grid.width):
                 self.world[row][col] = random.randint(0, 1)
 
-if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
+async def main():
+    loop = asyncio.get_running_loop()
     life_app = Life()
 
     def serialosc_device_added(id, type, port):
@@ -81,9 +81,12 @@ if __name__ == '__main__':
     serialosc = monome.SerialOsc()
     serialosc.device_added_event.add_handler(serialosc_device_added)
 
-    loop.run_until_complete(serialosc.connect())
+    await serialosc.connect()
 
     try:
-        loop.run_forever()
-    except KeyboardInterrupt:
+        await loop.create_future()
+    except asyncio.CancelledError:
         life_app.quit()
+
+if __name__ == '__main__':
+    asyncio.run(main())

@@ -44,8 +44,8 @@ class Faders(monome.GridApp):
             self.grid.led_col(x, 0, col)
             await asyncio.sleep(1/100)
 
-if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
+async def main():
+    loop = asyncio.get_running_loop()
     faders_app = Faders()
 
     def serialosc_device_added(id, type, port):
@@ -55,6 +55,8 @@ if __name__ == '__main__':
     serialosc = monome.SerialOsc()
     serialosc.device_added_event.add_handler(serialosc_device_added)
 
-    loop.run_until_complete(serialosc.connect())
+    await serialosc.connect()
+    await loop.create_future()
 
-    loop.run_forever()
+if __name__ == '__main__':
+    asyncio.run(main())

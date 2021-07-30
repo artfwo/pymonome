@@ -7,8 +7,8 @@ class HelloApp(monome.GridApp):
     def on_grid_key(self, x, y, s):
         self.grid.led_set(x, y, s)
 
-if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
+async def main():
+    loop = asyncio.get_running_loop()
     hello_app = HelloApp()
 
     def serialosc_device_added(id, type, port):
@@ -18,6 +18,8 @@ if __name__ == '__main__':
     serialosc = monome.SerialOsc()
     serialosc.device_added_event.add_handler(serialosc_device_added)
 
-    loop.run_until_complete(serialosc.connect())
+    await serialosc.connect()
+    await loop.create_future()
 
-    loop.run_forever()
+if __name__ == '__main__':
+    asyncio.run(main())
