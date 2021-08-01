@@ -24,10 +24,10 @@ class PagesSerialOsc(monome.SerialOsc):
         page_manager.connect()
 
     def on_device_added(self, id, type, port):
-        asyncio.async(self.pages_connect(port))
+        asyncio.ensure_future(self.pages_connect(port))
 
-if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
+async def main():
+    loop = asyncio.get_running_loop()
 
     pages = monome.SumGridPageManager(2)
 
@@ -44,6 +44,8 @@ if __name__ == '__main__':
     serialosc = monome.SerialOsc()
     serialosc.device_added_event.add_handler(serialosc_device_added)
 
-    loop.run_until_complete(serialosc.connect())
+    await serialosc.connect()
+    await loop.create_future()
 
-    loop.run_forever()
+if __name__ == '__main__':
+    asyncio.run(main())

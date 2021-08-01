@@ -5,8 +5,8 @@ import monome
 
 from life import Life
 
-if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
+async def main():
+    loop = asyncio.get_running_loop()
 
     section1 = monome.GridSection((8, 8), (0, 0))
     section2 = monome.GridSection((8, 8), (8, 0))
@@ -25,6 +25,8 @@ if __name__ == '__main__':
     serialosc = monome.SerialOsc()
     serialosc.device_added_event.add_handler(serialosc_device_added)
 
-    loop.run_until_complete(serialosc.connect())
+    await serialosc.connect()
+    await loop.create_future()
 
-    loop.run_forever()
+if __name__ == '__main__':
+    asyncio.run(main())
