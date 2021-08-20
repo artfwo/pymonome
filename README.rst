@@ -19,8 +19,8 @@ library directory::
 
     pip3 install --user pymonome
 
-Usage
-=====
+Basic usage
+===========
 
 pymonome does not communicate with any of the devices directly. Like many
 monome applications, it relies on serialosc for device detection and hardware
@@ -47,10 +47,34 @@ Alternatively, it is possible to instantiate the protocol class using the
     transport, grid = await loop.create_datagram_endpoint(monome.Grid,
         remote_addr=(GRID_HOST, GRID_PORT))
 
-In practice, however, UDP ports will be randomly assigned to devices as they
-are connected to the host computer. serialosc has a discovery and notification
-mechanism to notify clients about connected devices, so we can use this in
-pymonome as follows:
+Service discovery API
+=====================
+
+In practice UDP ports will be randomly assigned to devices as they
+are connected to the host computer. serialosc has a discovery and
+notification mechanism to notify clients about connected devices.
+It's possible to connect to the discovery service from pymonome too:
+
+.. code-block:: python
+
+    grid = monome.Grid()
+
+    def serialosc_device_added(id, type, port):
+        print('connecting to {} ({})'.format(id, type))
+        asyncio.ensure_future(grid.connect('127.0.0.1', port))
+
+    serialosc = monome.SerialOsc()
+    serialosc.device_added_event.add_handler(serialosc_device_added)
+
+    await serialosc.connect()
+
+Application classes
+===================
+
+For extra convenience pymonome provides base classes for developing
+grid and arc-based apps, apps on grid sections, or pages on the same grid.
+Application base classes provide handler stubs for input events
+and member properties for accessing controllers.
 
 .. code-block:: python
 
@@ -61,8 +85,8 @@ pymonome as follows:
         def on_grid_key(self, x, y, s):
             self.grid.led_set(x, y, s)
 
-    if __name__ == '__main__':
-        loop = asyncio.get_event_loop()
+    async def main():
+        loop = asyncio.get_running_loop()
         hello_app = HelloApp()
 
         def serialosc_device_added(id, type, port):
@@ -72,17 +96,24 @@ pymonome as follows:
         serialosc = monome.SerialOsc()
         serialosc.device_added_event.add_handler(serialosc_device_added)
 
-        loop.run_until_complete(serialosc.connect())
+        await serialosc.connect()
+        await loop.create_future() # run forever
 
-        loop.run_forever()
+    if __name__ == '__main__':
+        asyncio.run(main())
 
-In the example above, application instance (HelloApp) will be connected
-to the latest grid discovered and pressing the button will light the corresponding
-LED. For more examples see the ``examples/`` directory.
+In this example, HelloApp application instance will be connected
+to the latest discovered grid and pressing a button will light
+the corresponding LED.
+
+More examples
+=============
+
+For more examples see the ``examples/`` directory.
 
 License
 =======
 
-Copyright (c) 2011-2020 Artem Popov <artfwo@gmail.com>
+Copyright (c) 2011-2021 Artem Popov <artfwo@gmail.com>
 
 pymonome is licensed under the MIT license, please see LICENSE file for details.
