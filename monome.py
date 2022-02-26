@@ -102,7 +102,6 @@ class Device(aiosc.OSCProtocol):
                 loop = asyncio.get_event_loop()
 
         transport, protocol = await loop.create_datagram_endpoint(lambda: self,
-            local_addr=('127.0.0.1', 0),
             remote_addr=(host, port))
 
     def disconnect(self):
@@ -237,16 +236,16 @@ class SerialOsc(aiosc.OSCProtocol):
         self.send('/serialosc/list', self.host, self.port)
         self.send('/serialosc/notify', self.host, self.port)
 
-    async def connect(self, loop=None):
+    async def connect(self, host='127.0.0.1', loop=None):
         if loop is None:
             if sys.version_info >= (3, 7):
                 loop = asyncio.get_running_loop()
             else:
                 loop = asyncio.get_event_loop()
 
-        transport, protocol = await loop.create_datagram_endpoint(lambda: self,
-            local_addr=('127.0.0.1', 0),
-            remote_addr=('127.0.0.1', 12002))
+        transport, protocol = await loop.create_datagram_endpoint(
+            lambda: self, remote_addr=(host, 12002),
+        )
 
     def _on_serialosc_device(self, addr, path, id, type, port):
         type = type.strip() # remove trailing spaces for arcs
