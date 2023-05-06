@@ -20,12 +20,12 @@ class Faders(monome.GridApp):
             row_value += FADERS_MAX_VALUE / (self.grid.height - 1)
 
         self.values = [random.randint(0, FADERS_MAX_VALUE) for f in range(self.grid.width)]
-        self.faders = [asyncio.ensure_future(self.fade_to(f, 0)) for f in range(self.grid.width)]
+        self.faders = [asyncio.create_task(self.fade_to(f, 0)) for f in range(self.grid.width)]
 
     def on_grid_key(self, x, y, s):
         if s == 1:
             self.faders[x].cancel()
-            self.faders[x] = asyncio.ensure_future(self.fade_to(x, self.row_to_value(y)))
+            self.faders[x] = asyncio.create_task(self.fade_to(x, self.row_to_value(y)))
 
     def value_to_row(self, value):
         return sorted([i for i in range(self.grid.height)], key=lambda i: abs(self.row_values[i] - value))[0]
@@ -50,7 +50,7 @@ async def main():
 
     def serialosc_device_added(id, type, port):
         print('connecting to {} ({})'.format(id, type))
-        asyncio.ensure_future(faders_app.grid.connect('127.0.0.1', port))
+        asyncio.create_task(faders_app.grid.connect('127.0.0.1', port))
 
     serialosc = monome.SerialOsc()
     serialosc.device_added_event.add_handler(serialosc_device_added)

@@ -61,7 +61,7 @@ It's possible to connect to the discovery service from pymonome too:
 
     def serialosc_device_added(id, type, port):
         print('connecting to {} ({})'.format(id, type))
-        asyncio.ensure_future(grid.connect('127.0.0.1', port))
+        asyncio.create_task(grid.connect('127.0.0.1', port))
 
     serialosc = monome.SerialOsc()
     serialosc.device_added_event.add_handler(serialosc_device_added)
@@ -91,7 +91,7 @@ and member properties for accessing controllers.
 
         def serialosc_device_added(id, type, port):
             print('connecting to {} ({})'.format(id, type))
-            asyncio.ensure_future(hello_app.grid.connect('127.0.0.1', port))
+            asyncio.create_task(hello_app.grid.connect('127.0.0.1', port))
 
         serialosc = monome.SerialOsc()
         serialosc.device_added_event.add_handler(serialosc_device_added)

@@ -10,12 +10,12 @@ class Life(monome.GridApp):
     def __init__(self):
         super().__init__()
         self.alive = True
-        self.task = asyncio.ensure_future(asyncio.sleep(0))
+        self.task = asyncio.create_task(asyncio.sleep(0))
 
     def on_grid_ready(self):
         self.world = [[0 for col in range(self.grid.width)] for row in range(self.grid.height)]
         self.randomize()
-        self.task = asyncio.ensure_future(self.begin())
+        self.task = asyncio.create_task(self.begin())
 
     def on_grid_disconnect(self):
         self.task.cancel()
@@ -76,7 +76,7 @@ async def main():
 
     def serialosc_device_added(id, type, port):
         print('connecting to {} ({})'.format(id, type))
-        asyncio.ensure_future(life_app.grid.connect('127.0.0.1', port))
+        asyncio.create_task(life_app.grid.connect('127.0.0.1', port))
 
     serialosc = monome.SerialOsc()
     serialosc.device_added_event.add_handler(serialosc_device_added)

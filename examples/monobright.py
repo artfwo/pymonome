@@ -26,7 +26,7 @@ class MonobrightApp(monome.GridApp):
 
     def on_grid_key(self, x, y, s):
         if s == 1:
-            asyncio.ensure_future(self.light(x, y))
+            asyncio.create_task(self.light(x, y))
 
 
 async def main():
@@ -35,7 +35,7 @@ async def main():
 
     def serialosc_device_added(id, type, port):
         print('connecting to {} ({})'.format(id, type))
-        asyncio.ensure_future(monobright_app.grid.connect('127.0.0.1', port))
+        asyncio.create_task(monobright_app.grid.connect('127.0.0.1', port))
 
     serialosc = monome.SerialOsc()
     serialosc.device_added_event.add_handler(serialosc_device_added)

@@ -13,7 +13,7 @@ async def main():
 
     def serialosc_device_added(id, type, port):
         print('connecting to {} ({})'.format(id, type))
-        asyncio.ensure_future(hello_app.grid.connect('127.0.0.1', port))
+        asyncio.create_task(hello_app.grid.connect('127.0.0.1', port))
 
     serialosc = monome.SerialOsc()
     serialosc.device_added_event.add_handler(serialosc_device_added)

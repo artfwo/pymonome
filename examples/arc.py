@@ -47,7 +47,7 @@ async def main():
             return
 
         print(f'connecting to {id} ({type})')
-        asyncio.ensure_future(app.arc.connect('127.0.0.1', port))
+        asyncio.create_task(app.arc.connect('127.0.0.1', port))
 
     serialosc = monome.SerialOsc()
     serialosc.device_added_event.add_handler(serialosc_device_added)

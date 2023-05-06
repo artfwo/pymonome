@@ -24,7 +24,7 @@ class PagesSerialOsc(monome.SerialOsc):
         page_manager.connect()
 
     def on_device_added(self, id, type, port):
-        asyncio.ensure_future(self.pages_connect(port))
+        asyncio.create_task(self.pages_connect(port))
 
 async def main():
     loop = asyncio.get_running_loop()
@@ -39,7 +39,7 @@ async def main():
 
     def serialosc_device_added(id, type, port):
         print('connecting to {} ({})'.format(id, type))
-        asyncio.ensure_future(pages.grid.connect('127.0.0.1', port))
+        asyncio.create_task(pages.grid.connect('127.0.0.1', port))
 
     serialosc = monome.SerialOsc()
     serialosc.device_added_event.add_handler(serialosc_device_added)
