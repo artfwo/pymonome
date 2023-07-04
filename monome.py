@@ -629,6 +629,7 @@ class GridSection:
     def splitter_ready(self):
         self.width = self.section_width
         self.height = self.section_height
+        self.rotation = 0
         self.ready_event.dispatch()
 
     def splitter_disconnect(self):
