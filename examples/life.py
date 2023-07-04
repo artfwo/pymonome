@@ -14,6 +14,7 @@ class Life(monome.GridApp):
 
     def on_grid_ready(self):
         self.world = [[0 for col in range(self.grid.width)] for row in range(self.grid.height)]
+        self.buffer = monome.GridBuffer(self.grid.width, self.grid.height)
         self.randomize()
         self.task = asyncio.create_task(self.begin())
 
@@ -39,8 +40,12 @@ class Life(monome.GridApp):
             while True:
                 if self.alive:
                     self.update()
+
                     for i, row in enumerate(self.world):
-                        self.grid.led_row(0, i, row)
+                        self.buffer.led_row(0, i, row)
+
+                    self.buffer.render(self.grid)
+
                 await asyncio.sleep(0.2)
         except asyncio.CancelledError:
             pass
