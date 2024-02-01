@@ -51,13 +51,17 @@ class Device(aiosc.OSCProtocol):
         self.add_handler('/sys/disconnect', self._on_sys_disconnect)
         self.add_handler('/sys/{id,size,host,port,prefix,rotation}', self._on_sys_info)
 
+        self.connected = False
         self.transport = None
+
         self.prefix = prefix
+
         self.ready_event = Event()
         self.disconnect_event = Event()
-        self._unset_info_properties()
 
-    def _unset_info_properties(self):
+        self._reset_info_properties()
+
+    def _reset_info_properties(self):
         self.id = None
         self.width = None
         self.height = None
@@ -78,6 +82,7 @@ class Device(aiosc.OSCProtocol):
             self.rotation = args[0]
 
         if self._info_properties_set():
+            self.connected = True
             self.ready_event.dispatch()
 
     def connection_made(self, transport):
@@ -107,9 +112,9 @@ class Device(aiosc.OSCProtocol):
 
     def disconnect(self):
         self.disconnect_event.dispatch()
-        self._unset_info_properties()
+        self._reset_info_properties()
         self.transport.close()
-
+        self.connected = False
 
 class Grid(Device):
     def __init__(self, prefix='monome'):
