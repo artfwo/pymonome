@@ -6,7 +6,7 @@ import monome
 
 from perlin_noise import PerlinNoise
 
-class PerinApp(monome.GridApp):
+class PerlinApp(monome.GridApp):
     def __init__(self):
         super().__init__()
         self.noise = PerlinNoise()
@@ -51,7 +51,7 @@ class PerinApp(monome.GridApp):
 
 async def main():
     loop = asyncio.get_running_loop()
-    app = PerinApp()
+    app = PerlinApp()
 
     def serialosc_device_added(id, type, port):
         print('connecting to {} ({})'.format(id, type))
