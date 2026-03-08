@@ -605,8 +605,8 @@ class SumGridPageManager(GridPageManager):
 
     def display_chooser(self):
         self.grid.led_all(0)
-        page_row = [1 if i < len(self.pages) else 0 for i in range(self.grid.width)]
-        self.grid.led_row(0, self.grid.height - 1, page_row)
+        for i in range(len(self.pages)):
+            self.grid.led_set(i, self.grid.height - 1, 1)
         self.grid.led_col(self._selected_page_index, 0, [1] * self.grid.height)
 
 
