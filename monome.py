@@ -23,7 +23,6 @@ import asyncio
 import aiosc
 import itertools
 import re
-import sys
 
 def pack_row(row):
     return row[7] << 7 | row[6] << 6 | row[5] << 5 | row[4] << 4 | row[3] << 3 | row[2] << 2 | row[1] << 1 | row[0]
@@ -96,15 +95,11 @@ class Device(aiosc.OSCProtocol):
         self.send('/sys/info/size', self.host, self.port)
         self.send('/sys/info/rotation', self.host, self.port)
 
-    async def connect(self, host, port, loop=None):
+    async def connect(self, host, port):
         if self.transport is not None and not self.transport.is_closing():
             self.disconnect()
 
-        if loop is None:
-            if sys.version_info >= (3, 7):
-                loop = asyncio.get_running_loop()
-            else:
-                loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
 
         transport, protocol = await loop.create_datagram_endpoint(lambda: self,
             local_addr=('127.0.0.1', 0),
@@ -242,12 +237,8 @@ class SerialOsc(aiosc.OSCProtocol):
         self.send('/serialosc/list', self.host, self.port)
         self.send('/serialosc/notify', self.host, self.port)
 
-    async def connect(self, loop=None):
-        if loop is None:
-            if sys.version_info >= (3, 7):
-                loop = asyncio.get_running_loop()
-            else:
-                loop = asyncio.get_event_loop()
+    async def connect(self):
+        loop = asyncio.get_running_loop()
 
         transport, protocol = await loop.create_datagram_endpoint(lambda: self,
             local_addr=('127.0.0.1', 0),
