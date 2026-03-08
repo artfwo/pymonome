@@ -638,9 +638,10 @@ class GridSection:
             self.splitter.grid.led_set(x + self.x_offset, y + self.y_offset, s)
 
     def led_all(self, s):
-        # TODO: fix map
         data = [[s for col in range(8)] for row in range(8)]
-        self.splitter.grid.led_map(self.x_offset, self.y_offset, data)
+        for x_offset in range(0, self.section_width, 8):
+            for y_offset in range(0, self.section_height, 8):
+                self.splitter.grid.led_map(self.x_offset + x_offset, self.y_offset + y_offset, data)
 
     def led_map(self, x_offset, y_offset, data):
         self.splitter.grid.led_map(self.x_offset + x_offset, self.y_offset + y_offset, data)
@@ -662,7 +663,9 @@ class GridSection:
 
     def led_level_all(self, l):
         data = [[l for col in range(8)] for row in range(8)]
-        self.splitter.grid.led_map(self.x_offset, self.y_offset, data)
+        for x_offset in range(0, self.section_width, 8):
+            for y_offset in range(0, self.section_height, 8):
+                self.splitter.grid.led_level_map(self.x_offset + x_offset, self.y_offset + y_offset, data)
 
     def led_level_map(self, x_offset, y_offset, data):
         self.splitter.grid.led_level_map(self.x_offset + x_offset, self.y_offset + y_offset, data)
