@@ -476,6 +476,7 @@ class GridPage:
         self.ready_event.dispatch()
 
     def manager_disconnect(self):
+        self.connected = False
         self.disconnect_event.dispatch()
 
     @property
