@@ -400,11 +400,7 @@ class GridBuffer:
                 self.levels[y + y_offset][x] = l
 
     def get_level_map(self, x_offset, y_offset):
-        map = []
-        for y in range(y_offset, y_offset + 8):
-            row = [self.levels[y][col] for col in range(x_offset, x_offset + 8)]
-            map.append(row)
-        return map
+        return [self.levels[y][x_offset:x_offset + 8] for y in range(y_offset, y_offset + 8)]
 
     def render(self, grid):
         for x_offset in [i * 8 for i in range(self.width // 8)]:
