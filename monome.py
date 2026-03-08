@@ -261,16 +261,19 @@ class SerialOsc(aiosc.OSCProtocol):
 
 class GridApp:
     def __init__(self, grid=None):
+        self.grid = None
+
         if grid is None:
             grid = Grid()
 
         self.set_grid(grid)
 
     def set_grid(self, grid):
-        self.grid.ready_event.remove_handler(self.on_grid_ready)
-        self.grid.disconnect_event.remove_handler(self.on_grid_disconnect)
-        self.grid.key_event.remove_handler(self.on_grid_key)
-        self.grid.tilt_event.remove_handler(self.on_tilt)
+        if self.grid is not None:
+            self.grid.ready_event.remove_handler(self.on_grid_ready)
+            self.grid.disconnect_event.remove_handler(self.on_grid_disconnect)
+            self.grid.key_event.remove_handler(self.on_grid_key)
+            self.grid.tilt_event.remove_handler(self.on_tilt)
 
         self.grid = grid
 
@@ -294,16 +297,19 @@ class GridApp:
 
 class ArcApp:
     def __init__(self, arc=None):
+        self.arc = None
+
         if arc is None:
             arc = Arc()
 
         self.set_arc(arc)
 
     def set_arc(self, arc):
-        self.arc.ready_event.remove_handler(self.on_arc_ready)
-        self.arc.disconnect_event.remove_handler(self.on_arc_disconnect)
-        self.arc.delta_event.remove_handler(self.on_arc_delta)
-        self.arc.key_event.remove_handler(self.on_arc_key)
+        if self.arc is not None:
+            self.arc.ready_event.remove_handler(self.on_arc_ready)
+            self.arc.disconnect_event.remove_handler(self.on_arc_disconnect)
+            self.arc.delta_event.remove_handler(self.on_arc_delta)
+            self.arc.key_event.remove_handler(self.on_arc_key)
 
         self.arc = arc
 
