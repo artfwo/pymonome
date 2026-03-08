@@ -395,28 +395,27 @@ class GridBuffer:
 
 
 class ArcBuffer:
-    def __init__(self, rings):
-        self.rings = rings
-        self.levels = [[0 for i in range(64)] for ring in range(rings)]
+    def __init__(self, num_rings):
+        self.num_rings = num_rings
+        self.levels = [[0 for i in range(64)] for ring in range(num_rings)]
 
     def __and__(self, other):
-        rings = len(self.levels)
-        result = ArcBuffer(rings)
-        for ring in range(rings):
+        result = ArcBuffer(self.num_rings)
+        for ring in range(self.num_rings):
             for x in range(64):
                 result.levels[ring][x] = self.levels[ring][x] & other.levels[ring][x]
         return result
 
     def __xor__(self, other):
-        result = ArcBuffer(self.rings)
-        for ring in range(self.rings):
+        result = ArcBuffer(self.num_rings)
+        for ring in range(self.num_rings):
             for x in range(64):
                 result.levels[ring][x] = self.levels[ring][x] ^ other.levels[ring][x]
         return result
 
     def __or__(self, other):
-        result = ArcBuffer(self.rings)
-        for ring in range(self.rings):
+        result = ArcBuffer(self.num_rings)
+        for ring in range(self.num_rings):
             for x in range(64):
                 result.levels[ring][x] = self.levels[ring][x] | other.levels[ring][x]
         return result
@@ -425,17 +424,19 @@ class ArcBuffer:
         self.levels[n][x] = l
 
     def ring_all(self, n, l):
-        self.levels[n] = [l] * 64
+        for x in range(64):
+            self.levels[n][x] = l
 
     def ring_map(self, n, data):
-        self.levels[n] = data
+        for x in range(64):
+            self.levels[n][x] = data[x]
 
     def ring_range(self, n, x1, x2, l):
         for i in range(x1, x2 + 1):
             self.levels[n][i] = l
 
     def render(self, arc):
-        for i in range (self.rings):
+        for i in range(self.num_rings):
             arc.ring_map(i, self.levels[i])
 
 
