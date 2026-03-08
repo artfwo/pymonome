@@ -135,59 +135,59 @@ class Grid(Device):
         self.tilt_event.dispatch(n, x, y, z)
 
     def led_set(self, x, y, s):
-        self.send('/{}/grid/led/set'.format(self.prefix), x, y, s)
+        self.send(f'/{self.prefix}/grid/led/set', x, y, s)
 
     def led_all(self, s):
-        self.send('/{}/grid/led/all'.format(self.prefix), s)
+        self.send(f'/{self.prefix}/grid/led/all', s)
 
     def led_map(self, x_offset, y_offset, data):
         args = [pack_row(data[i]) for i in range(8)]
-        self.send('/{}/grid/led/map'.format(self.prefix), x_offset, y_offset, *args)
+        self.send(f'/{self.prefix}/grid/led/map', x_offset, y_offset, *args)
 
     def led_row(self, x_offset, y, data):
         args = [pack_row(data[i*8:(i+1)*8]) for i in range(len(data) // 8)]
-        self.send('/{}/grid/led/row'.format(self.prefix), x_offset, y, *args)
+        self.send(f'/{self.prefix}/grid/led/row', x_offset, y, *args)
 
     def led_col(self, x, y_offset, data):
         args = [pack_row(data[i*8:(i+1)*8]) for i in range(len(data) // 8)]
-        self.send('/{}/grid/led/col'.format(self.prefix), x, y_offset, *args)
+        self.send(f'/{self.prefix}/grid/led/col', x, y_offset, *args)
 
     def led_intensity(self, i):
-        self.send('/{}/grid/led/intensity'.format(self.prefix), i)
+        self.send(f'/{self.prefix}/grid/led/intensity', i)
 
     def led_level_set(self, x, y, l):
         if self.varibright:
-            self.send('/{}/grid/led/level/set'.format(self.prefix), x, y, l)
+            self.send(f'/{self.prefix}/grid/led/level/set', x, y, l)
         else:
             self.led_set(x, y, l >> 3 & 1)
 
     def led_level_all(self, l):
         if self.varibright:
-            self.send('/{}/grid/led/level/all'.format(self.prefix), l)
+            self.send(f'/{self.prefix}/grid/led/level/all', l)
         else:
             self.led_all(l >> 3 & 1)
 
     def led_level_map(self, x_offset, y_offset, data):
         if self.varibright:
             args = itertools.chain(*data)
-            self.send('/{}/grid/led/level/map'.format(self.prefix), x_offset, y_offset, *args)
+            self.send(f'/{self.prefix}/grid/led/level/map', x_offset, y_offset, *args)
         else:
             self.led_map(x_offset, y_offset, [[l >> 3 & 1 for l in row] for row in data])
 
     def led_level_row(self, x_offset, y, data):
         if self.varibright:
-            self.send('/{}/grid/led/level/row'.format(self.prefix), x_offset, y, *data)
+            self.send(f'/{self.prefix}/grid/led/level/row', x_offset, y, *data)
         else:
             self.led_row(x_offset, y, [l >> 3 & 1 for l in data])
 
     def led_level_col(self, x, y_offset, data):
         if self.varibright:
-            self.send('/{}/grid/led/level/col'.format(self.prefix), x, y_offset, *data)
+            self.send(f'/{self.prefix}/grid/led/level/col', x, y_offset, *data)
         else:
             self.led_col(x, y_offset, [l >> 3 & 1 for l in data])
 
     def tilt_set(self, n, s):
-        self.send('/{}/tilt/set'.format(self.prefix), n, s)
+        self.send(f'/{self.prefix}/tilt/set', n, s)
 
 
 class Arc(Device):
@@ -207,16 +207,16 @@ class Arc(Device):
         self.key_event.dispatch(n, s)
 
     def ring_set(self, n, x, l):
-        self.send('/{}/ring/set'.format(self.prefix), n, x, l)
+        self.send(f'/{self.prefix}/ring/set', n, x, l)
 
     def ring_all(self, n, l):
-        self.send('/{}/ring/all'.format(self.prefix), n, l)
+        self.send(f'/{self.prefix}/ring/all', n, l)
 
     def ring_map(self, n, data):
-        self.send('/{}/ring/map'.format(self.prefix), n, *data)
+        self.send(f'/{self.prefix}/ring/map', n, *data)
 
     def ring_range(self, n, x1, x2, l):
-        self.send('/{}/ring/range'.format(self.prefix), n, x1, x2, l)
+        self.send(f'/{self.prefix}/ring/range', n, x1, x2, l)
 
 
 class SerialOsc(aiosc.OSCProtocol):
@@ -566,7 +566,7 @@ class SeqGridPageManager(GridPageManager):
 
 
 class SumGridPageManager(GridPageManager):
-    def __init__(self, num_pages=1, switch_button=(-1, -1), **kwargs):
+    def __init__(self, num_pages=1, switch_button=(-1, -1)):
         super().__init__(num_pages)
         self._switch_button = switch_button
         self._selected_page_index = -1
