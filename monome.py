@@ -448,6 +448,7 @@ class GridPage:
         self.disconnect_event = Event()
         self.key_event = Event()
         self.tilt_event = Event()
+        self.connected = False
 
     def manager_ready(self):
         self.id = 'grid_page'
@@ -456,6 +457,7 @@ class GridPage:
         self.rotation = self.manager.grid.rotation
 
         self.buffer = GridBuffer(self.width, self.height)
+        self.connected = True
         self.ready_event.dispatch()
 
     def manager_disconnect(self):
