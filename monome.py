@@ -220,7 +220,7 @@ class Arc(Device):
 
 
 class SerialOsc(aiosc.OSCProtocol):
-    def __init__(self, loop=None, autoconnect_app=None):
+    def __init__(self):
         super().__init__(handlers={
             '/serialosc/device': self._on_serialosc_device,
             '/serialosc/add': self._on_serialosc_add,
