@@ -565,6 +565,7 @@ class SeqGridPageManager(GridPageManager):
     def __init__(self, num_pages=1, switch_button=(-1, -1)):
         super().__init__(num_pages)
         self._switch_button = switch_button
+        self._presses = set()
 
     def on_grid_ready(self):
         super().on_grid_ready()
@@ -574,11 +575,16 @@ class SeqGridPageManager(GridPageManager):
         self._switch_y = self.grid.height + switch_y if switch_y < 0 else switch_y
 
     def on_grid_key(self, x, y, s):
-        # TODO: bring back presses from pymonome 0.8
-        if x == self._switch_x and y == self._switch_y and s == 1:
+        if not self._presses and x == self._switch_x and y == self._switch_y and s == 1:
             self.set_current_page((self.pages.index(self.current_page) + 1) % len(self.pages))
+            return
+
+        if s == 1:
+            self._presses.add((x, y))
         else:
-            super().on_grid_key(x, y, s)
+            self._presses.discard((x, y))
+
+        super().on_grid_key(x, y, s)
 
 
 class SumGridPageManager(GridPageManager):
