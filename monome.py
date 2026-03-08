@@ -76,7 +76,7 @@ class Device(aiosc.OSCProtocol):
         if path == '/sys/id':
             self.id = args[0]
         elif path == '/sys/size':
-            self.width, self.height = (args[0], args[1])
+            self.width, self.height = args[0], args[1]
         elif path == '/sys/rotation':
             self.rotation = args[0]
 
@@ -375,8 +375,8 @@ class GridBuffer:
             self.levels[y][x] = l
 
     def led_level_all(self, l):
-        for x in range(self.width):
-            for y in range(self.height):
+        for y in range(self.height):
+            for x in range(self.width):
                 self.levels[y][x] = l
 
     def led_level_map(self, x_offset, y_offset, data):
@@ -554,7 +554,7 @@ class GridPageManager(GridApp):
 
     def set_current_page(self, index):
         self.current_page = self.pages[index]
-        if (self.current_page.buffer):
+        if self.current_page.buffer:
             self.current_page.buffer.render(self.grid)
 
 
@@ -581,6 +581,7 @@ class SeqGridPageManager(GridPageManager):
 class SumGridPageManager(GridPageManager):
     def __init__(self, num_pages=1, switch_button=(-1, -1)):
         super().__init__(num_pages)
+
         self._switch_button = switch_button
         self._selected_page_index = -1
         self._presses = set()
@@ -695,6 +696,7 @@ class GridSection:
 class GridSplitter(GridApp):
     def __init__(self, sections):
         super().__init__()
+
         self._sections = sections
         for section in self._sections:
             section.splitter = self
