@@ -417,17 +417,17 @@ class ArcBuffer:
         return result
 
     def __xor__(self, other):
-        result = GridBuffer(self.width, self.height)
-        for row in range(self.height):
-            for col in range(self.width):
-                result.levels[row][col] = self.levels[row][col] ^ other.levels[row][col]
+        result = ArcBuffer(self.rings)
+        for ring in range(self.rings):
+            for x in range(64):
+                result.levels[ring][x] = self.levels[ring][x] ^ other.levels[ring][x]
         return result
 
     def __or__(self, other):
-        result = GridBuffer(self.width, self.height)
-        for row in range(self.height):
-            for col in range(self.width):
-                result.levels[row][col] = self.levels[row][col] | other.levels[row][col]
+        result = ArcBuffer(self.rings)
+        for ring in range(self.rings):
+            for x in range(64):
+                result.levels[ring][x] = self.levels[ring][x] | other.levels[ring][x]
         return result
 
     def ring_set(self, n, x, l):
