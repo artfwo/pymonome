@@ -646,14 +646,17 @@ class GridSection:
         self.disconnect_event = Event()
         self.key_event = Event()
         self.tilt_event = Event()
+        self.connected = False
 
     def splitter_ready(self):
         self.width = self.section_width
         self.height = self.section_height
         self.rotation = 0
+        self.connected = True
         self.ready_event.dispatch()
 
     def splitter_disconnect(self):
+        self.connected = False
         self.disconnect_event.dispatch()
 
     def led_set(self, x, y, s):
