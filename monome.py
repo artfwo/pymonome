@@ -80,7 +80,7 @@ class Device(aiosc.OSCProtocol):
         elif path == '/sys/rotation':
             self.rotation = args[0]
 
-        if self._info_properties_set():
+        if not self.connected and self._info_properties_set():
             self.connected = True
             self.ready_event.dispatch()
 
