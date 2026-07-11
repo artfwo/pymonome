@@ -130,8 +130,7 @@ class Grid(Device):
         self.ready_event.add_handler(self._set_varibright)
 
     def _set_varibright(self):
-        if not re.match(r'^m\d+$', self.id, flags=re.IGNORECASE):
-            self.varibright = False
+        self.varibright = re.match(r'^m\d+$', self.id, flags=re.IGNORECASE) is not None
 
     def _on_grid_key(self, addr, path, x, y, s):
         self.key_event.dispatch(x, y, s)
