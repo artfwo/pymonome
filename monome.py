@@ -478,6 +478,9 @@ class GridProxy:
     def led_intensity(self, i):
         self.parent.grid.led_intensity(i)
 
+    def tilt_set(self, n, s):
+        self.parent.grid.tilt_set(n, s)
+
 
 class GridPage(GridProxy):
     def __init__(self, parent):
@@ -562,6 +565,10 @@ class GridPageManager(GridApp):
 
     def on_grid_key(self, x, y, s):
         self.current_page.key_event.dispatch(x, y, s)
+
+    def on_tilt(self, n, x, y, z):
+        for page in self.pages:
+            page.tilt_event.dispatch(n, x, y, z)
 
     def on_grid_disconnect(self):
         for page in self.pages:
@@ -726,3 +733,7 @@ class GridSplitter(GridApp):
             if section.x_offset <= x < section.x_offset + section.section_width and \
                section.y_offset <= y < section.y_offset + section.section_height:
                 section.key_event.dispatch(x - section.x_offset, y - section.y_offset, s)
+
+    def on_tilt(self, n, x, y, z):
+        for section in self._sections:
+            section.tilt_event.dispatch(n, x, y, z)
