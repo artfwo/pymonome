@@ -51,7 +51,6 @@ class Device(aiosc.OSCProtocol):
         self.add_handler('/sys/{id,size,host,port,prefix,rotation}', self._on_sys_info)
 
         self.connected = False
-        self.transport = None
 
         self.prefix = prefix
 
@@ -96,24 +95,20 @@ class Device(aiosc.OSCProtocol):
         self.send('/sys/info/rotation', self.host, self.port)
 
     async def connect(self, host, port):
-        if self.transport is not None and not self.transport.is_closing():
-            self.disconnect()
+        self.disconnect()
 
         loop = asyncio.get_running_loop()
 
-        transport, protocol = await loop.create_datagram_endpoint(lambda: self,
+        await loop.create_datagram_endpoint(lambda: self,
             local_addr=('127.0.0.1', 0),
             remote_addr=(host, port))
 
     def disconnect(self):
-        if self.transport is None:
-            return
-
         if self.connected:
             self.disconnect_event.dispatch()
 
         self._reset_info_properties()
-        self.transport.close()
+        self.close()
         self.connected = False
 
 class Grid(Device):

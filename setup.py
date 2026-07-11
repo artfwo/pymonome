@@ -16,7 +16,7 @@ setup(
     py_modules=['monome'],
     include_package_data=True,
     install_requires=[
-        'aiosc'
+        'aiosc>=0.3'
     ],
     classifiers=[
         'Development Status :: 4 - Beta',
