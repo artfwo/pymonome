@@ -106,7 +106,12 @@ class Device(aiosc.OSCProtocol):
             remote_addr=(host, port))
 
     def disconnect(self):
-        self.disconnect_event.dispatch()
+        if self.transport is None:
+            return
+
+        if self.connected:
+            self.disconnect_event.dispatch()
+
         self._reset_info_properties()
         self.transport.close()
         self.connected = False
