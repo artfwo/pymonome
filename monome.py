@@ -453,10 +453,9 @@ class ArcBuffer:
             arc.ring_map(i, self.levels[i])
 
 
-class GridPage:
-    def __init__(self, manager):
-        self.manager = manager
-        self.buffer = None
+class GridProxy:
+    def __init__(self):
+        self.parent = None
 
         self.ready_event = Event()
         self.disconnect_event = Event()
@@ -464,76 +463,90 @@ class GridPage:
         self.tilt_event = Event()
         self.connected = False
 
-    def manager_ready(self):
-        self.id = 'grid_page'
-        self.width = self.manager.grid.width
-        self.height = self.manager.grid.height
-        self.rotation = self.manager.grid.rotation
+        self.width = None
+        self.height = None
+        self.rotation = None
 
-        self.buffer = GridBuffer(self.width, self.height)
+    def parent_ready(self):
         self.connected = True
         self.ready_event.dispatch()
 
-    def manager_disconnect(self):
+    def parent_disconnect(self):
         self.connected = False
         self.disconnect_event.dispatch()
 
+    def led_intensity(self, i):
+        self.parent.grid.led_intensity(i)
+
+
+class GridPage(GridProxy):
+    def __init__(self, parent):
+        super().__init__()
+        self.parent = parent
+        self.buffer = None
+
+    def parent_ready(self):
+        self.id = 'grid_page'
+        self.width = self.parent.grid.width
+        self.height = self.parent.grid.height
+        self.rotation = self.parent.grid.rotation
+
+        self.buffer = GridBuffer(self.width, self.height)
+        super().parent_ready()
+
     @property
     def active(self):
-        return self is self.manager.current_page
+        return self is self.parent.current_page
 
     def led_set(self, x, y, s):
         self.buffer.led_set(x, y, s)
         if self.active:
-            self.manager.grid.led_set(x, y, s)
+            self.parent.grid.led_set(x, y, s)
 
     def led_all(self, s):
         self.buffer.led_all(s)
         if self.active:
-            self.manager.grid.led_all(s)
+            self.parent.grid.led_all(s)
 
     def led_map(self, x_offset, y_offset, data):
         self.buffer.led_map(x_offset, y_offset, data)
         if self.active:
-            self.manager.grid.led_map(x_offset, y_offset, data)
+            self.parent.grid.led_map(x_offset, y_offset, data)
 
     def led_row(self, x_offset, y, data):
         self.buffer.led_row(x_offset, y, data)
         if self.active:
-            self.manager.grid.led_row(x_offset, y, data)
+            self.parent.grid.led_row(x_offset, y, data)
 
     def led_col(self, x, y_offset, data):
         self.buffer.led_col(x, y_offset, data)
         if self.active:
-            self.manager.grid.led_col(x, y_offset, data)
-
-    def led_intensity(self, i):
-        self.manager.grid.led_intensity(i)
+            self.parent.grid.led_col(x, y_offset, data)
 
     def led_level_set(self, x, y, l):
         self.buffer.led_level_set(x, y, l)
         if self.active:
-            self.manager.grid.led_level_set(x, y, l)
+            self.parent.grid.led_level_set(x, y, l)
 
     def led_level_all(self, l):
         self.buffer.led_level_all(l)
         if self.active:
-            self.manager.grid.led_level_all(l)
+            self.parent.grid.led_level_all(l)
 
     def led_level_map(self, x_offset, y_offset, data):
         self.buffer.led_level_map(x_offset, y_offset, data)
         if self.active:
-            self.manager.grid.led_level_map(x_offset, y_offset, data)
+            self.parent.grid.led_level_map(x_offset, y_offset, data)
 
     def led_level_row(self, x_offset, y, data):
         self.buffer.led_level_row(x_offset, y, data)
         if self.active:
-            self.manager.grid.led_level_row(x_offset, y, data)
+            self.parent.grid.led_level_row(x_offset, y, data)
 
     def led_level_col(self, x, y_offset, data):
         self.buffer.led_level_col(x, y_offset, data)
         if self.active:
-            self.manager.grid.led_level_col(x, y_offset, data)
+            self.parent.grid.led_level_col(x, y_offset, data)
 
 
 class GridPageManager(GridApp):
@@ -545,14 +558,14 @@ class GridPageManager(GridApp):
 
     def on_grid_ready(self):
         for page in self.pages:
-            page.manager_ready()
+            page.parent_ready()
 
     def on_grid_key(self, x, y, s):
         self.current_page.key_event.dispatch(x, y, s)
 
     def on_grid_disconnect(self):
         for page in self.pages:
-            page.manager_disconnect()
+            page.parent_disconnect()
 
     def set_current_page(self, index):
         self.current_page = self.pages[index]
@@ -634,76 +647,62 @@ class SumGridPageManager(GridPageManager):
         self.grid.led_col(self._selected_page_index, 0, [1] * self.grid.height)
 
 
-class GridSection:
+class GridSection(GridProxy):
     def __init__(self, size, offset):
-        self.splitter = None
+        super().__init__()
 
         self.section_width = size[0]
         self.section_height = size[1]
         self.x_offset = offset[0]
         self.y_offset = offset[1]
 
-        self.ready_event = Event()
-        self.disconnect_event = Event()
-        self.key_event = Event()
-        self.tilt_event = Event()
-        self.connected = False
-
-    def splitter_ready(self):
+    def parent_ready(self):
         self.width = self.section_width
         self.height = self.section_height
         self.rotation = 0
-        self.connected = True
-        self.ready_event.dispatch()
-
-    def splitter_disconnect(self):
-        self.connected = False
-        self.disconnect_event.dispatch()
+        super().parent_ready()
 
     def led_set(self, x, y, s):
         if x < self.section_width and y < self.section_height:
-            self.splitter.grid.led_set(x + self.x_offset, y + self.y_offset, s)
+            self.parent.grid.led_set(x + self.x_offset, y + self.y_offset, s)
 
     def led_all(self, s):
         data = [[s for col in range(8)] for row in range(8)]
         for x_offset in range(0, self.section_width, 8):
             for y_offset in range(0, self.section_height, 8):
-                self.splitter.grid.led_map(self.x_offset + x_offset, self.y_offset + y_offset, data)
+                self.parent.grid.led_map(self.x_offset + x_offset, self.y_offset + y_offset, data)
 
     def led_map(self, x_offset, y_offset, data):
-        self.splitter.grid.led_map(self.x_offset + x_offset, self.y_offset + y_offset, data)
+        self.parent.grid.led_map(self.x_offset + x_offset, self.y_offset + y_offset, data)
 
     def led_row(self, x_offset, y, data):
         data = data[:self.section_width]
-        self.splitter.grid.led_row(self.x_offset + x_offset, self.y_offset + y, data)
+        self.parent.grid.led_row(self.x_offset + x_offset, self.y_offset + y, data)
 
     def led_col(self, x, y_offset, data):
         data = data[:self.section_height]
-        self.splitter.grid.led_col(self.x_offset + x, self.y_offset + y_offset, data)
-
-    def led_intensity(self, i):
-        self.splitter.grid.led_intensity(i)
+        self.parent.grid.led_col(self.x_offset + x, self.y_offset + y_offset, data)
 
     def led_level_set(self, x, y, l):
         if x < self.section_width and y < self.section_height:
-            self.splitter.grid.led_level_set(self.x_offset + x, self.y_offset + y, l)
+            self.parent.grid.led_level_set(self.x_offset + x, self.y_offset + y, l)
 
     def led_level_all(self, l):
         data = [[l for col in range(8)] for row in range(8)]
         for x_offset in range(0, self.section_width, 8):
             for y_offset in range(0, self.section_height, 8):
-                self.splitter.grid.led_level_map(self.x_offset + x_offset, self.y_offset + y_offset, data)
+                self.parent.grid.led_level_map(self.x_offset + x_offset, self.y_offset + y_offset, data)
 
     def led_level_map(self, x_offset, y_offset, data):
-        self.splitter.grid.led_level_map(self.x_offset + x_offset, self.y_offset + y_offset, data)
+        self.parent.grid.led_level_map(self.x_offset + x_offset, self.y_offset + y_offset, data)
 
     def led_level_row(self, x_offset, y, data):
         data = data[:self.section_width]
-        self.splitter.grid.led_level_row(self.x_offset + x_offset, self.y_offset + y, data)
+        self.parent.grid.led_level_row(self.x_offset + x_offset, self.y_offset + y, data)
 
     def led_level_col(self, x, y_offset, data):
         data = data[:self.section_height]
-        self.splitter.grid.led_level_col(self.x_offset + x, self.y_offset + y_offset, data)
+        self.parent.grid.led_level_col(self.x_offset + x, self.y_offset + y_offset, data)
 
 
 class GridSplitter(GridApp):
@@ -712,15 +711,15 @@ class GridSplitter(GridApp):
 
         self._sections = sections
         for section in self._sections:
-            section.splitter = self
+            section.parent = self
 
     def on_grid_ready(self):
         for section in self._sections:
-            section.splitter_ready()
+            section.parent_ready()
 
     def on_grid_disconnect(self):
         for section in self._sections:
-            section.splitter_disconnect()
+            section.parent_disconnect()
 
     def on_grid_key(self, x, y, s):
         for section in self._sections:
