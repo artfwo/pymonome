@@ -575,6 +575,10 @@ class GridPageManager(GridApp):
             page.parent_disconnect()
 
     def set_current_page(self, index):
+        if index is None:
+            self.current_page = None
+            return
+
         self.current_page = self.pages[index]
         if self.current_page.buffer:
             self.current_page.buffer.render(self.grid)
@@ -627,8 +631,7 @@ class SumGridPageManager(GridPageManager):
         if not self._presses and x == self._switch_x and y == self._switch_y:
             if s == 1:
                 self._selected_page_index = self.pages.index(self.current_page)
-                # TODO: implement proper setter for this case
-                self.current_page = None
+                self.set_current_page(None)
                 self.display_chooser()
             else:
                 self.set_current_page(self._selected_page_index)
@@ -643,6 +646,8 @@ class SumGridPageManager(GridPageManager):
         if s == 1:
             self._presses.add((x, y))
         else:
+            if (x, y) not in self._presses:
+                return
             self._presses.discard((x, y))
 
         super().on_grid_key(x, y, s)
