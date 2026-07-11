@@ -586,6 +586,8 @@ class SeqGridPageManager(GridPageManager):
         if s == 1:
             self._presses.add((x, y))
         else:
+            if (x, y) not in self._presses:
+                return
             self._presses.discard((x, y))
 
         super().on_grid_key(x, y, s)
