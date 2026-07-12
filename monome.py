@@ -281,6 +281,9 @@ class GridApp:
         self.grid.key_event.add_handler(self.on_grid_key)
         self.grid.tilt_event.add_handler(self.on_tilt)
 
+        if self.grid.connected:
+            self.on_grid_ready()
+
     def on_grid_ready(self):
         pass
 
@@ -316,6 +319,9 @@ class ArcApp:
         self.arc.disconnect_event.add_handler(self.on_arc_disconnect)
         self.arc.delta_event.add_handler(self.on_arc_delta)
         self.arc.key_event.add_handler(self.on_arc_key)
+
+        if self.arc.connected:
+            self.on_arc_ready()
 
     def on_arc_ready(self):
         pass
