@@ -469,11 +469,15 @@ class GridProxy:
         self.tilt_event = Event()
         self.connected = False
 
+        self.id = None
         self.width = None
         self.height = None
         self.rotation = None
+        self.varibright = None
 
     def parent_ready(self):
+        self.id = self.parent.grid.id
+        self.varibright = self.parent.grid.varibright
         self.connected = True
         self.ready_event.dispatch()
 
@@ -495,7 +499,6 @@ class GridPage(GridProxy):
         self.buffer = None
 
     def parent_ready(self):
-        self.id = 'grid_page'
         self.width = self.parent.grid.width
         self.height = self.parent.grid.height
         self.rotation = self.parent.grid.rotation
