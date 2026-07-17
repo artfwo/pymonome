@@ -378,35 +378,36 @@ class GridBuffer:
             self.led_row(x_offset, y_offset + r, row)
 
     def led_row(self, x_offset, y, data):
-        for x, s in enumerate(data):
-            self.led_set(x_offset + x, y, s)
+        self.led_level_row(x_offset, y, [s * 15 for s in data])
 
     def led_col(self, x, y_offset, data):
-        for y, s in enumerate(data):
-            self.led_set(x, y_offset + y, s)
+        self.led_level_col(x, y_offset, [s * 15 for s in data])
 
     def led_level_set(self, x, y, l):
-        if x < self.width and y < self.height:
+        if 0 <= x < self.width and 0 <= y < self.height:
             self.levels[y][x] = l
 
     def led_level_all(self, l):
-        for y in range(self.height):
-            for x in range(self.width):
-                self.levels[y][x] = l
+        for row in self.levels:
+            row[:] = [l] * self.width
 
     def led_level_map(self, x_offset, y_offset, data):
         for r, row in enumerate(data):
             self.led_level_row(x_offset, y_offset + r, row)
 
     def led_level_row(self, x_offset, y, data):
-        if y < self.height:
-            for x, l in enumerate(data[:self.width - x_offset]):
-                self.levels[y][x + x_offset] = l
+        if 0 <= y < self.height:
+            start = max(x_offset, 0)
+            stop = min(x_offset + len(data), self.width)
+            if start < stop:
+                self.levels[y][start:stop] = data[start - x_offset:stop - x_offset]
 
     def led_level_col(self, x, y_offset, data):
-        if x < self.width:
-            for y, l in enumerate(data[:self.height - y_offset]):
-                self.levels[y + y_offset][x] = l
+        if 0 <= x < self.width:
+            start = max(y_offset, 0)
+            stop = min(y_offset + len(data), self.height)
+            for y in range(start, stop):
+                self.levels[y][x] = data[y - y_offset]
 
     def get_level_map(self, x_offset, y_offset):
         return [self.levels[y][x_offset:x_offset + 8] for y in range(y_offset, y_offset + 8)]
@@ -692,10 +693,7 @@ class GridSection(GridProxy):
             self.parent.grid.led_set(x + self.x_offset, y + self.y_offset, s)
 
     def led_all(self, s):
-        data = [[s for col in range(8)] for row in range(8)]
-        for x_offset in range(0, self.section_width, 8):
-            for y_offset in range(0, self.section_height, 8):
-                self.parent.grid.led_map(self.x_offset + x_offset, self.y_offset + y_offset, data)
+        self.led_level_all(s * 15)
 
     def led_map(self, x_offset, y_offset, data):
         self.parent.grid.led_map(self.x_offset + x_offset, self.y_offset + y_offset, data)
