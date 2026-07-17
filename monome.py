@@ -30,16 +30,18 @@ def pack_row(row):
 
 class Event:
     def __init__(self):
-        self.handlers = set()
+        self.handlers = []
 
     def add_handler(self, handler):
-        self.handlers.add(handler)
+        if handler not in self.handlers:
+            self.handlers.append(handler)
 
     def remove_handler(self, handler):
-        self.handlers.discard(handler)
+        if handler in self.handlers:
+            self.handlers.remove(handler)
 
     def dispatch(self, *args, **kwargs):
-        for handler in self.handlers:
+        for handler in list(self.handlers):
             handler(*args, **kwargs)
 
 
@@ -81,7 +83,11 @@ class Device(aiosc.OSCProtocol):
 
         if not self.connected and self._info_properties_set():
             self.connected = True
+            self._on_ready()
             self.ready_event.dispatch()
+
+    def _on_ready(self):
+        pass
 
     def connection_made(self, transport):
         super().connection_made(transport)
@@ -122,9 +128,7 @@ class Grid(Device):
         self.tilt_event = Event()
         self.varibright = True
 
-        self.ready_event.add_handler(self._set_varibright)
-
-    def _set_varibright(self):
+    def _on_ready(self):
         self.varibright = re.match(r'^m\d+$', self.id, flags=re.IGNORECASE) is not None
 
     def _on_grid_key(self, addr, path, x, y, s):
