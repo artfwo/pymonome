@@ -76,20 +76,14 @@ class Life(monome.GridApp):
                 self.world[row][col] = random.randint(0, 1)
 
 async def main():
-    loop = asyncio.get_running_loop()
     life_app = Life()
 
-    def serialosc_device_added(id, type, port):
-        print('connecting to {} ({})'.format(id, type))
-        asyncio.create_task(life_app.grid.connect('127.0.0.1', port))
-
     serialosc = monome.SerialOsc()
-    serialosc.device_added_event.add_handler(serialosc_device_added)
-
+    serialosc.bind(life_app.grid)
     await serialosc.connect()
 
     try:
-        await loop.create_future()
+        await asyncio.Future()
     except asyncio.CancelledError:
         life_app.quit()
 

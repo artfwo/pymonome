@@ -24,6 +24,7 @@ import aiosc
 import itertools
 import re
 
+
 def pack_row(row):
     return row[7] << 7 | row[6] << 6 | row[5] << 5 | row[4] << 4 | row[3] << 3 | row[2] << 2 | row[1] << 1 | row[0]
 
@@ -116,6 +117,7 @@ class Device(aiosc.OSCProtocol):
         self._reset_info_properties()
         self.close()
         self.connected = False
+
 
 class Grid(Device):
     def __init__(self, prefix='monome'):
@@ -233,6 +235,36 @@ class SerialOsc(aiosc.OSCProtocol):
         self.device_added_event = Event()
         self.device_removed_event = Event()
 
+        self._routes = []
+        self._routed_devices = set()
+
+    def bind(self, device, id=(), type=()):
+        ids = (id,) if isinstance(id, str) else id
+        types = (type,) if isinstance(type, str) else type
+
+        self._routes.append((device, ids, types))
+
+        device.disconnect_event.add_handler(lambda: self._routed_devices.discard(device))
+
+    def _route_device(self, id, type, port):
+        device_kind = Arc if 'arc' in type else Grid
+
+        # try more specific routes first: id + type, id, type, unfiltered
+        routes = sorted(self._routes, key=lambda r: (not r[1], not r[2]))
+
+        for device, ids, types in routes:
+            if not isinstance(device, device_kind) or device.connected or device in self._routed_devices:
+                continue
+            if ids and id not in ids:
+                continue
+            if types and type not in types:
+                continue
+
+            self._routed_devices.add(device)
+            asyncio.create_task(device.connect('127.0.0.1', port))
+
+            return
+
     def connection_made(self, transport):
         super().connection_made(transport)
         self.host, self.port = transport.get_extra_info('sockname')
@@ -243,17 +275,19 @@ class SerialOsc(aiosc.OSCProtocol):
     async def connect(self):
         loop = asyncio.get_running_loop()
 
-        transport, protocol = await loop.create_datagram_endpoint(lambda: self,
+        await loop.create_datagram_endpoint(lambda: self,
             local_addr=('127.0.0.1', 0),
             remote_addr=('127.0.0.1', 12002))
 
     def _on_serialosc_device(self, addr, path, id, type, port):
         type = type.strip() # remove trailing spaces for arcs
         self.device_added_event.dispatch(id, type, port)
+        self._route_device(id, type, port)
 
     def _on_serialosc_add(self, addr, path, id, type, port):
         type = type.strip() # remove trailing spaces for arcs
         self.device_added_event.dispatch(id, type, port)
+        self._route_device(id, type, port)
         self.send('/serialosc/notify', self.host, self.port)
 
     def _on_serialosc_remove(self, addr, path, id, type, port):

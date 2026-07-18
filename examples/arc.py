@@ -38,24 +38,14 @@ class ArcTest(monome.ArcApp):
                 self.arc.ring_all(ring, 0)
 
 async def main():
-    loop = asyncio.get_running_loop()
     app = ArcTest()
 
-    def serialosc_device_added(id, type, port):
-        if 'arc' not in type:
-            print(f'ignoring {id} ({type}) as device does not appear to be an arc')
-            return
-
-        print(f'connecting to {id} ({type})')
-        asyncio.create_task(app.arc.connect('127.0.0.1', port))
-
     serialosc = monome.SerialOsc()
-    serialosc.device_added_event.add_handler(serialosc_device_added)
-
+    serialosc.bind(app.arc)
     await serialosc.connect()
 
     try:
-        await loop.create_future()
+        await asyncio.Future()
     except asyncio.CancelledError:
         app.cleanup()
 
